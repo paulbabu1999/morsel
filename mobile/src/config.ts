@@ -14,7 +14,17 @@
  *     3. Make sure the backend is started with host 0.0.0.0 (it is, via run.sh)
  *        and the phone is on the same Wi-Fi network.
  */
-export const API_URL = 'http://Incognito.local:8000';
+// Hosted backend (Render). Works anywhere — no LAN/same-wifi requirement.
+// For local backend dev, swap to your machine's LAN IP, e.g. http://192.168.x.x:8000
+export const API_URL = 'https://morsel-api-9s89.onrender.com';
 
 /** Network request timeout in milliseconds. */
 export const REQUEST_TIMEOUT_MS = 12000;
+
+/**
+ * Longer timeout for auth calls (login / signup / boot-time /auth/me).
+ * The hosted backend runs on Render's free tier, so the FIRST request after it
+ * has idled cold-starts and can take 30–60s. Auth is almost always that first
+ * call, so it gets extra headroom before we give up and show a timeout error.
+ */
+export const AUTH_REQUEST_TIMEOUT_MS = 30000;

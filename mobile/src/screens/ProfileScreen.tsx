@@ -26,6 +26,7 @@ import {
   type Sex,
 } from '../api';
 import { capitalize, round, withCommas } from '../utils/format';
+import { useAuth } from '../auth/AuthContext';
 
 const SEXES: Sex[] = ['male', 'female'];
 const ACTIVITY: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'active', 'very_active'];
@@ -41,6 +42,7 @@ const ACTIVITY_LABEL: Record<ActivityLevel, string> = {
 };
 
 export function ProfileScreen() {
+  const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -75,21 +77,41 @@ export function ProfileScreen() {
         title="Profile"
         subtitle={profile && !editing ? 'Your personalized targets' : 'Set up your calorie goal'}
       />
-      {loading ? (
-        <Loading label="Loading your profile…" />
-      ) : loadError ? (
-        <ErrorView error={loadError} onRetry={load} />
-      ) : editing ? (
-        <ProfileForm
-          initial={profile}
-          isOnboarding={profile == null}
-          onSaved={onSaved}
-          onCancel={profile ? () => setEditing(false) : undefined}
-        />
-      ) : profile ? (
-        <ProfileView profile={profile} onEdit={() => setEditing(true)} />
-      ) : null}
+      <View style={styles.flex}>
+        {loading ? (
+          <Loading label="Loading your profile…" />
+        ) : loadError ? (
+          <ErrorView error={loadError} onRetry={load} />
+        ) : editing ? (
+          <ProfileForm
+            initial={profile}
+            isOnboarding={profile == null}
+            onSaved={onSaved}
+            onCancel={profile ? () => setEditing(false) : undefined}
+          />
+        ) : profile ? (
+          <ProfileView profile={profile} onEdit={() => setEditing(true)} />
+        ) : null}
+      </View>
+      <AccountBar email={user?.email} onLogout={() => void signOut()} />
     </SafeAreaView>
+  );
+}
+
+/** Always-visible footer: which account you're in + a one-tap logout. */
+function AccountBar({ email, onLogout }: { email?: string; onLogout: () => void }) {
+  return (
+    <View style={styles.accountBar}>
+      <View style={styles.accountInfo}>
+        <Text style={styles.accountLabel}>Signed in as</Text>
+        <Text style={styles.accountEmail} numberOfLines={1}>
+          {email ?? '—'}
+        </Text>
+      </View>
+      <TouchableOpacity onPress={onLogout} style={styles.logoutBtn} activeOpacity={0.8}>
+        <Text style={styles.logoutText}>Log out</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -428,4 +450,34 @@ const styles = StyleSheet.create({
   submit: { marginTop: spacing.xl },
   cancelBtn: { marginTop: spacing.md },
   disclaimer: { fontSize: font.tiny, color: colors.textFaint, marginTop: spacing.md, lineHeight: 16, textAlign: 'center' },
+
+  // account / logout footer
+  accountBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  accountInfo: { flex: 1 },
+  accountLabel: {
+    fontSize: font.tiny,
+    fontWeight: '800',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  accountEmail: { fontSize: font.small, fontWeight: '700', color: colors.text, marginTop: 1 },
+  logoutBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  logoutText: { color: colors.primary, fontSize: font.small, fontWeight: '800' },
 });

@@ -5,7 +5,8 @@
  * All network calls go through `request()`, which adds a timeout and converts
  * low-level fetch failures into a friendly, actionable ApiError.
  */
-import { API_URL, REQUEST_TIMEOUT_MS } from './config';
+import * as SecureStore from 'expo-secure-store';
+import { API_URL, AUTH_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from './config';
 
 // ---------------------------------------------------------------------------
 // Contract types
@@ -241,6 +242,19 @@ export interface HealthResponse {
 
 export type StatsPeriod = 'day' | 'week' | 'month';
 
+/** Returned by POST /auth/signup and POST /auth/login. */
+export interface AuthResult {
+  token: string;
+  user_id: string;
+  email: string;
+}
+
+/** Returned by GET /auth/me — the identity behind the current token. */
+export interface AuthUser {
+  user_id: string;
+  email: string;
+}
+
 // ---------------------------------------------------------------------------
 // Error handling
 // ---------------------------------------------------------------------------
@@ -265,6 +279,84 @@ const NETWORK_HINT =
   'LAN IP (e.g. http://192.168.1.42:8000), on the same Wi-Fi.';
 
 // ---------------------------------------------------------------------------
+// Auth token storage
+//
+// The JWT is persisted with expo-secure-store (Keychain / Keystore) so a
+// relaunch keeps the user signed in, and mirrored in memory so `request()` can
+// attach it synchronously without awaiting the secure store on every call.
+// Call `loadToken()` once on boot to hydrate the in-memory copy.
+// ---------------------------------------------------------------------------
+
+const TOKEN_KEY = 'morsel_token';
+
+/** In-memory mirror of the persisted token (null when logged out). */
+let authToken: string | null = null;
+
+/**
+ * Hydrate the in-memory token from secure storage. Call once on app boot,
+ * before deciding whether to show the login screen. Returns the token (or null).
+ */
+export async function loadToken(): Promise<string | null> {
+  try {
+    authToken = await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    // Secure store unavailable (e.g. web) — treat as logged out.
+    authToken = null;
+  }
+  return authToken;
+}
+
+/** The current bearer token, or null when logged out. Synchronous. */
+export function getToken(): string | null {
+  return authToken;
+}
+
+async function setToken(token: string): Promise<void> {
+  authToken = token;
+  try {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+  } catch {
+    // Persist failed — the token still lives in memory for this session.
+  }
+}
+
+async function clearToken(): Promise<void> {
+  authToken = null;
+  try {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Forced-logout subscription. When a protected call comes back 401/403 with a
+ * token attached, the token is stale: we clear it and notify listeners so the
+ * AuthProvider can drop back to the login screen (the RN analogue of the web
+ * client's hard redirect to /login).
+ */
+type AuthExpiredHandler = () => void;
+const authExpiredHandlers = new Set<AuthExpiredHandler>();
+
+/** Subscribe to forced logout. Returns an unsubscribe function. */
+export function onAuthExpired(handler: AuthExpiredHandler): () => void {
+  authExpiredHandlers.add(handler);
+  return () => {
+    authExpiredHandlers.delete(handler);
+  };
+}
+
+function notifyAuthExpired(): void {
+  authExpiredHandlers.forEach((h) => {
+    try {
+      h();
+    } catch {
+      // a broken listener must not wedge the others
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Core request helper
 // ---------------------------------------------------------------------------
 
@@ -272,17 +364,35 @@ interface RequestOptions {
   method?: 'GET' | 'POST';
   body?: BodyInit;
   headers?: Record<string, string>;
+  /**
+   * When true (the default), a 401/403 on a request that carried a token clears
+   * that token and fires the auth-expired handler, bouncing the app to login.
+   * Auth calls (login / signup / me) opt out so wrong credentials or a boot-time
+   * token check surface as ordinary errors instead of a forced logout.
+   */
+  bounceOnAuthError?: boolean;
+  /** Override the request timeout (auth calls use a longer one for cold starts). */
+  timeoutMs?: number;
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { bounceOnAuthError = true, timeoutMs = REQUEST_TIMEOUT_MS } = options;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Attach the bearer token. We build a fresh headers object so we never mutate
+  // the caller's; for a FormData body we deliberately leave Content-Type unset
+  // so fetch adds the multipart boundary itself.
+  const headers: Record<string, string> = { ...options.headers };
+  if (authToken && !('Authorization' in headers) && !('authorization' in headers)) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
 
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: options.method ?? 'GET',
-      headers: options.headers,
+      headers,
       body: options.body,
       signal: controller.signal,
     });
@@ -294,6 +404,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new ApiError(NETWORK_HINT, { isNetwork: true });
   }
   clearTimeout(timer);
+
+  // Stale/invalid token on a protected call → drop it and return to login.
+  if ((res.status === 401 || res.status === 403) && bounceOnAuthError && authToken) {
+    await clearToken();
+    notifyAuthExpired();
+    throw new ApiError('Your session has expired. Please log in again.', { status: res.status });
+  }
 
   if (!res.ok) {
     let detail = '';
@@ -326,6 +443,49 @@ export interface ListMealsParams {
 
 export function getHealth(): Promise<HealthResponse> {
   return request<HealthResponse>('/health');
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+/** Create an account. Persists the returned JWT on success. 409 if email taken. */
+export async function signup(email: string, password: string): Promise<AuthResult> {
+  const result = await request<AuthResult>('/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+    bounceOnAuthError: false,
+    timeoutMs: AUTH_REQUEST_TIMEOUT_MS,
+  });
+  await setToken(result.token);
+  return result;
+}
+
+/** Log in. Persists the returned JWT on success. 401 on wrong credentials. */
+export async function login(email: string, password: string): Promise<AuthResult> {
+  const result = await request<AuthResult>('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+    bounceOnAuthError: false,
+    timeoutMs: AUTH_REQUEST_TIMEOUT_MS,
+  });
+  await setToken(result.token);
+  return result;
+}
+
+/** Resolve the current token to its user — used to validate the token on boot. */
+export function me(): Promise<AuthUser> {
+  return request<AuthUser>('/auth/me', {
+    bounceOnAuthError: false,
+    timeoutMs: AUTH_REQUEST_TIMEOUT_MS,
+  });
+}
+
+/** Client-side sign-out: clear the stored + in-memory token. */
+export function logout(): Promise<void> {
+  return clearToken();
 }
 
 /** Current user's profile, or null until onboarding is complete. */
