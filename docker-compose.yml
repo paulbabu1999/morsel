@@ -1,0 +1,26 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: morsel-db
+    environment:
+      POSTGRES_DB: morsel
+      POSTGRES_USER: morsel_owner
+      POSTGRES_PASSWORD: morsel_owner_pw
+      # The two app roles (morsel_app / morsel_ro) and their dev passwords are
+      # created in 03_roles.sql and mirrored in backend/app/config.py.
+    ports:
+      - "5433:5432"          # host 5433 -> container 5432 (avoids clashing a local pg)
+    volumes:
+      - morsel_pgdata:/var/lib/postgresql/data
+      # init scripts run in lexical order, once, on an empty data dir
+      - ./backend/db/01_extensions.sql:/docker-entrypoint-initdb.d/01_extensions.sql:ro
+      - ./backend/db/02_schema.sql:/docker-entrypoint-initdb.d/02_schema.sql:ro
+      - ./backend/db/03_roles.sql:/docker-entrypoint-initdb.d/03_roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U morsel_owner -d morsel"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  morsel_pgdata:

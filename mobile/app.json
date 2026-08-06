@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Morsel",
+    "slug": "foodapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "morsel",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Morsel uses the camera to snap photos of your meals.",
+        "NSPhotoLibraryUsageDescription": "Morsel needs access to your photos to attach meal images."
+      }
+    },
+    "android": {
+      "package": "com.morsel.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F6F5F1",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Morsel needs access to your photos to attach meal images.",
+          "cameraPermission": "Morsel uses the camera to snap photos of your meals."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c7912840-ac1f-46d5-b154-303ec021f7c0"
+      }
+    },
+    "owner": "ploblablus-team"
+  }
+}
