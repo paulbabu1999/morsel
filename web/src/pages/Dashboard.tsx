@@ -17,6 +17,7 @@ import type {
   StatsResponse,
 } from "../api";
 import { useAsync } from "../lib/useAsync";
+import { useProfile } from "../lib/profile";
 import {
   formatNumber,
   formatPercent,
@@ -107,7 +108,11 @@ function InsightsCard({
 
 export function Dashboard() {
   const [period, setPeriod] = useState<Period>("week");
-  const stats = useAsync<StatsResponse>(() => api.getStats(period), [period]);
+  // Refetch when the profile changes so a target update on the Profile page
+  // reflects here (targets ride along in /stats and /insights).
+  const { profile } = useProfile();
+  const profileKey = profile?.updated_at ?? "";
+  const stats = useAsync<StatsResponse>(() => api.getStats(period), [period, profileKey]);
   const today = useAsync(() => api.listMeals({ start: startOfDayISO() }), []);
 
   return (
@@ -180,7 +185,11 @@ function DashboardBody({
   // Micros = everything in adequacy except protein (shown as a macro above).
   const micros = stats.adequacy.filter((a) => a.nutrient !== "protein_g");
 
-  const insights = useAsync<InsightsResponse>(() => api.getInsights(period), [period]);
+  const { profile } = useProfile();
+  const insights = useAsync<InsightsResponse>(
+    () => api.getInsights(period),
+    [period, profile?.updated_at ?? ""],
+  );
 
   return (
     <>
