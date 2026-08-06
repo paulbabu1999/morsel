@@ -30,11 +30,17 @@ def _configure(conn: psycopg.Connection) -> None:
     register_vector(conn)
 
 
+# prepare_threshold=None disables auto server-side prepared statements, which
+# are incompatible with connection poolers (Neon/PgBouncer in transaction mode).
+_PG_KWARGS = {"prepare_threshold": None}
+
+
 def app_pool() -> ConnectionPool:
     global _app_pool
     if _app_pool is None:
         _app_pool = ConnectionPool(
-            config.APP_DSN, min_size=1, max_size=5, configure=_configure, open=True
+            config.APP_DSN, min_size=1, max_size=5, kwargs=_PG_KWARGS,
+            configure=_configure, open=True,
         )
     return _app_pool
 
@@ -43,7 +49,8 @@ def ro_pool() -> ConnectionPool:
     global _ro_pool
     if _ro_pool is None:
         _ro_pool = ConnectionPool(
-            config.RO_DSN, min_size=1, max_size=3, configure=_configure, open=True
+            config.RO_DSN, min_size=1, max_size=3, kwargs=_PG_KWARGS,
+            configure=_configure, open=True,
         )
     return _ro_pool
 

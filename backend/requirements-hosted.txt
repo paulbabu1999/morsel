@@ -1,0 +1,28 @@
+# Hosted deps (Render free tier). Same as requirements.txt but WITHOUT fastembed
+# /onnxruntime — the hosted backend uses EMBED_PROVIDER=gemini (API embeddings),
+# so no local model is loaded and RAM stays under the 512 MB limit.
+
+# web
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+python-multipart==0.0.19
+
+# data layer
+psycopg[binary,pool]==3.2.3
+pgvector==0.3.6
+
+# retrieval / agent
+langgraph==0.2.61
+langchain-core==0.3.29
+sqlglot==25.34.0
+
+# llm + http (gemini via openai-compat; embeddings via httpx)
+anthropic==0.42.0
+openai==2.53.0
+httpx==0.28.1
+
+# auth
+PyJWT==2.10.1
+bcrypt==4.2.1
+email-validator==2.2.0

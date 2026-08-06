@@ -86,8 +86,16 @@ USDA_API_KEY = os.getenv("USDA_API_KEY", "DEMO_KEY")
 USDA_BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 
 # --- Embeddings -----------------------------------------------------------
-EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-small-en-v1.5")
-EMBED_DIM = 384
+# local  = fastembed bge-small (384-dim, in-process; great on a big-RAM host)
+# gemini = Google text-embedding-004 API (768-dim; keeps the backend light so it
+#          fits a small free host like Render's 512 MB tier — no onnxruntime).
+EMBED_PROVIDER = os.getenv("EMBED_PROVIDER", "local").lower()
+if EMBED_PROVIDER == "gemini":
+    EMBED_MODEL = os.getenv("EMBED_MODEL", "gemini-embedding-001")
+    EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))  # request outputDimensionality
+else:
+    EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+    EMBED_DIM = int(os.getenv("EMBED_DIM", "384"))
 
 # --- Retrieval knobs ------------------------------------------------------
 SEMANTIC_TOP_K = 20        # candidates per retrieval arm before RRF

@@ -46,10 +46,10 @@ def _row_to_entity(row: dict) -> dict:
 
 def _find_or_create_entity(norm: str, fallback: dict | None) -> tuple[dict, str]:
     """Return (entity per-100g dict, method) — method in {alias, similar, usda, fallback}."""
-    vec = _vec_literal(norm)
     with db.app_pool().connection() as conn:
         with conn.cursor() as cur:
-            # 2. exact / alias
+            # 2. exact / alias — no embedding needed (the common path; skips a
+            # network call entirely when EMBED_PROVIDER=gemini).
             cur.execute(
                 """SELECT * FROM food_entities
                    WHERE lower(canonical_name) = %s
@@ -60,6 +60,9 @@ def _find_or_create_entity(norm: str, fallback: dict | None) -> tuple[dict, str]
             row = cur.fetchone()
             if row:
                 return _row_to_entity(_named(cur, row)), "alias"
+
+            # only now do we need the embedding (similarity + possible insert)
+            vec = _vec_literal(norm)
 
             # 3. embedding similarity
             cur.execute(

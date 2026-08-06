@@ -1,6 +1,10 @@
+-- Extensions. Runs first, as the DB owner, on an empty data dir.
+CREATE EXTENSION IF NOT EXISTS vector;   -- pgvector: vector(N) type + HNSW/IVFFlat
+CREATE EXTENSION IF NOT EXISTS pg_trgm;  -- trigram similarity (fuzzy name fallback)
+
 -- Morsel schema. One Postgres DB serves BOTH query paths:
 --   * normalized numeric rows (meals, meal_items) for aggregate text-to-SQL
---   * a vector(384) embedding + tsvector on meals for semantic/hybrid search
+--   * a vector(768) embedding + tsvector on meals for semantic/hybrid search
 -- Embedding dim 384 = BAAI/bge-small-en-v1.5 (see backend/app/embeddings.py).
 --
 -- Nutrient convention:
@@ -33,7 +37,7 @@ CREATE TABLE food_entities (
     iron_mg         REAL        NOT NULL DEFAULT 0,
     calcium_mg      REAL        NOT NULL DEFAULT 0,
     potassium_mg    REAL        NOT NULL DEFAULT 0,
-    name_embedding  vector(384),
+    name_embedding  vector(768),
     created_at      TIMESTAMP NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX food_entities_canonical_key ON food_entities (lower(canonical_name));
@@ -102,7 +106,7 @@ CREATE TABLE meals (
     total_iron_mg       REAL    NOT NULL DEFAULT 0,
     total_calcium_mg    REAL    NOT NULL DEFAULT 0,
     total_potassium_mg  REAL    NOT NULL DEFAULT 0,
-    embedding       vector(384),
+    embedding       vector(768),
     -- tags are intentionally omitted: array_to_string is only STABLE, which a
     -- generated column forbids. description already carries item names/location.
     description_tsv tsvector GENERATED ALWAYS AS (
@@ -182,3 +186,11 @@ CREATE POLICY meal_items_isolation ON meal_items
     USING (user_id = current_setting('app.current_user_id', true));
 CREATE POLICY user_profile_isolation ON user_profile
     USING (user_id = current_setting('app.current_user_id', true));
+
+CREATE ROLE morsel_ro WITH LOGIN PASSWORD 'MORSEL_RO_PW' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+GRANT USAGE ON SCHEMA public TO morsel_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO morsel_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO morsel_ro;
+ALTER ROLE morsel_ro SET default_transaction_read_only = on;
+ALTER ROLE morsel_ro SET statement_timeout = '5s';
+REVOKE ALL ON users FROM morsel_ro;
