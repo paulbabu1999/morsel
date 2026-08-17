@@ -194,3 +194,15 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO morsel_ro;
 ALTER ROLE morsel_ro SET default_transaction_read_only = on;
 ALTER ROLE morsel_ro SET statement_timeout = '5s';
 REVOKE ALL ON users FROM morsel_ro;
+
+-- ---------------------------------------------------------------------------
+-- Read/write app role.  CRITICAL on Neon: the DB owner (`neondb_owner`) has
+-- rolbypassrls=true, which SKIPS RLS entirely — if the app connected as the
+-- owner, every user would see every user's rows. So the app MUST connect as
+-- this dedicated NOBYPASSRLS role for the FORCE'd policies above to enforce.
+-- Point MORSEL_APP_DSN at morsel_app (NOT neondb_owner).
+-- ---------------------------------------------------------------------------
+CREATE ROLE morsel_app WITH LOGIN PASSWORD 'MORSEL_APP_PW' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+GRANT USAGE ON SCHEMA public TO morsel_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO morsel_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO morsel_app;

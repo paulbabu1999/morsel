@@ -17,7 +17,7 @@ by Postgres Row-Level Security.
 | Web (React PWA) | **Cloudflare Pages** (project `morsel`) | https://morsel-7yy.pages.dev |
 | Backend (FastAPI) | **Render** free (`srv-d9q28vm1egvs73d5rfog`) | https://morsel-api-9s89.onrender.com |
 | DB | **Neon** Postgres + pgvector (us-east-1) | see `NEON_SETUP_DSN` |
-| LLM + embeddings | **Google Gemini** free | `gemini-flash-latest`, `gemini-embedding-001` |
+| LLM + embeddings | **Google Gemini** free | `gemini-flash-lite-latest` (chat/vision), `gemini-embedding-001` (768-dim) |
 | Nutrition | **USDA FoodData Central** | — |
 | Code | **GitHub** | github.com/paulbabu1999/morsel |
 
@@ -52,14 +52,17 @@ mobile: `npx tsc --noEmit`.
 
 ## Making a change & deploying
 
-### Backend  (auto-deploys on push)
+### Backend  (deploy is MANUAL — Render pulls a public repo URL with no GitHub webhook, so pushing does NOT auto-deploy)
 1. Edit `backend/app/**`. Run `pytest tests/`.
-2. Commit + push `main` → **Render auto-deploys** (autoDeploy on). Poll status:
-   `curl -H "Authorization: Bearer $RENDER_API_KEY" https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys?limit=1`
+2. Commit + push `main`, then **trigger the deploy yourself** (autoDeploy never fires here):
+   `curl -X POST -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" -d '{"clearCache":"do_not_clear"}' https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys`
+   Poll: `curl -H "Authorization: Bearer $RENDER_API_KEY" https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys?limit=1` until `status:live`.
+   (Use `"clearCache":"clear"` only when a dependency changed — e.g. adding Pillow.)
 3. Hosted uses `requirements-hosted.txt` (no fastembed) + `EMBED_PROVIDER=gemini`.
    If you add a dependency, add it to BOTH `requirements.txt` and `requirements-hosted.txt`.
-4. Change a hosted env var: `PUT /v1/services/$SVC/env-vars/{KEY}` then trigger a deploy
-   (`POST /v1/services/$SVC/deploys`). Mirror the value into `backend/.env.hosting`.
+4. Change a hosted env var: `PUT /v1/services/$SVC/env-vars/{KEY}` (use curl — macOS system Python's
+   urllib has no CA certs). A PUT while a deploy is in-flight is ignored by that deploy — wait for
+   `live`, then `POST /deploys`. Mirror the value into `backend/.env.hosting`.
 
 ### Web  (manual deploy — Cloudflare Pages is NOT git-connected)
 ```bash
@@ -85,10 +88,10 @@ the Render URL. Run in Expo Go (`npx expo start`) or build an APK:
 ## Config / env cheat-sheet
 | Var | Local (`backend/.env`) | Hosted (Render / `.env.hosting`) |
 |---|---|---|
-| `LLM_PROVIDER` / `LLM_MODEL` | gemini / gemini-flash-latest | same |
+| `LLM_PROVIDER` / `LLM_MODEL` | gemini / gemini-flash-latest | gemini / **`gemini-flash-lite-latest`** (flash-latest→gemini-3.7-flash is only 20 free req/day; lite has a bigger free quota) |
 | `EMBED_PROVIDER` | **local** (fastembed 384) | **gemini** (`gemini-embedding-001`, 768) |
 | `EMBED_DIM` | 384 | 768 |
-| `MORSEL_APP_DSN` / `MORSEL_RO_DSN` | localhost:5433 roles | Neon roles (owner / morsel_ro) |
+| `MORSEL_APP_DSN` / `MORSEL_RO_DSN` | localhost:5433 roles | Neon **`morsel_app`** (non-bypass!) / `morsel_ro` — NOT `neondb_owner` |
 | `JWT_SECRET` | dev default | random secret |
 | `SEED_ON_SIGNUP` | 1 (demo data) | **0** (real users start empty) |
 | `GEMINI_API_KEY` / `USDA_API_KEY` | real keys | same |
@@ -108,6 +111,12 @@ isolates each user. Public routes: `/health`, `/auth/*`, `/query/examples`.
   `gemini-embedding-001` (request `outputDimensionality`). See `app/llm/client.py`, `app/embeddings.py`.
 - **RLS**: any meal/profile query MUST go through `db.app_tx` / `run_readonly_sql` (sets
   the user GUC). A bare `app_pool` query returns nothing (RLS `FORCE`d). `food_entities`/`users` are global.
+- **Neon BYPASSRLS trap (critical)**: Neon's `neondb_owner` has `rolbypassrls=true`, so RLS is
+  SKIPPED for it — if `MORSEL_APP_DSN` connects as the owner, **every user sees every user's rows**.
+  The app must connect as the dedicated **`morsel_app`** role (`LOGIN NOBYPASSRLS`, granted
+  `SELECT,INSERT,UPDATE,DELETE` on the app tables) — that's what makes hosted RLS actually enforce.
+  Verify after any DB/role change: a brand-new signup's `GET /meals` must be `[]`. Local Docker's
+  `morsel_app` is already non-bypass, so this bug is Neon-only. See `deploy/neon_setup.sql`.
 - **text-to-SQL** runs on the read-only `morsel_ro` role via `sql_guard` (single SELECT,
   table allowlist, forced LIMIT); `users` is revoked from it.
 - **Timestamps** are naive `timestamp` (no `Z`) = wall clock; clients parse as local.
