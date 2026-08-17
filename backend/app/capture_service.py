@@ -54,12 +54,35 @@ def _tags(items: list[dict], location: str | None) -> list[str]:
         f = _FOODS_BY_NAME.get(it["canonical_name"].lower())
         if f:
             tags.extend(f["tags"])
-    loc = LOCATIONS_BY_NAME.get((location or "").lower(), {})
-    if loc.get("kind") and loc["kind"] != "home":
-        tags.append(loc["kind"])
-    if loc.get("eat_out"):
+    loc_name = (location or "").strip()
+    known = LOCATIONS_BY_NAME.get(loc_name.lower(), {})
+    if known.get("kind") and known["kind"] != "home":
+        tags.append(known["kind"])
+    # Any named place that isn't home counts as eating out — so "Dunkin",
+    # "Starbucks", etc. (not in the seed catalog) are still tagged eating-out.
+    if loc_name and loc_name.lower() != "home" and known.get("eat_out", True):
         tags.append("eating-out")
     return sorted(set(tags))
+
+
+def _thumbnail_data_url(photo_bytes: bytes, max_px: int = 384) -> str | None:
+    """Resize the captured photo to a small JPEG thumbnail and return it as a
+    data: URL, so the real photo (not a placeholder) shows up in history. Kept
+    small (~20-40 KB) to stay light in the DB and API responses."""
+    try:
+        import base64
+        import io
+
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+        img.thumbnail((max_px, max_px))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=60, optimize=True)
+        b64 = base64.standard_b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{b64}"
+    except Exception:
+        return None
 
 
 def _describe(meal_type: str, items: list[dict], location: str | None, note: str | None) -> str:
@@ -91,7 +114,7 @@ def analyze(
         "location": loc,
         "note": note,
         "source": source,
-        "photo_uri": None,
+        "photo_uri": _thumbnail_data_url(photo_bytes) if photo_bytes else None,
         "description": description,
         "tags": _tags(items, loc),
         "confidence": round(confidence, 2),
