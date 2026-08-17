@@ -14,6 +14,7 @@ import { PageHead } from "../components/ui";
 import { ErrorState } from "../components/states";
 import { SourceBadge } from "../components/badges";
 import {
+  IconCamera,
   IconCheck,
   IconImage,
   IconInfo,
@@ -48,7 +49,10 @@ export function Capture() {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [saved, setSaved] = useState<Meal | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  // Two distinct pickers: the camera (capture="environment" opens the rear
+  // camera on phones) and the photo library (a plain file input).
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
 
   function onPickPhoto(file: File | null) {
     if (preview) URL.revokeObjectURL(preview);
@@ -115,36 +119,83 @@ export function Capture() {
               <span className="label">
                 Photo <span className="opt">· optional</span>
               </span>
-              <label
-                className="dropzone"
-                onClick={() => fileRef.current?.click()}
-                onKeyDown={(e) => e.key === "Enter" && fileRef.current?.click()}
-                role="button"
-                tabIndex={0}
-              >
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
-                />
-                {preview ? (
+
+              {/* Hidden inputs. The camera one requests the rear camera on
+                  phones; the library one is a plain image picker. */}
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+              />
+              <input
+                ref={libraryRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+              />
+
+              {preview ? (
+                <div className="photo-picked">
                   <div className="dropzone-preview">
                     <img src={preview} alt="Selected meal" />
                     <div>
                       <div style={{ fontWeight: 600, color: "var(--text)" }}>
                         {photo?.name}
                       </div>
-                      <div className="card-hint">Click to replace</div>
+                      <div className="card-hint">Retake or choose another below</div>
                     </div>
                   </div>
-                ) : (
-                  <div style={{ display: "grid", placeItems: "center", gap: 8 }}>
-                    <IconImage width={26} height={26} />
-                    <div>Click to add a photo</div>
+                  <div className="photo-actions">
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => cameraRef.current?.click()}
+                    >
+                      <IconCamera width={16} height={16} />
+                      Retake
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => libraryRef.current?.click()}
+                    >
+                      <IconImage width={16} height={16} />
+                      Choose another
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => onPickPhoto(null)}
+                    >
+                      <IconTrash width={16} height={16} />
+                      Remove
+                    </button>
                   </div>
-                )}
-              </label>
+                </div>
+              ) : (
+                <div className="photo-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => cameraRef.current?.click()}
+                  >
+                    <IconCamera width={17} height={17} />
+                    Take photo
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => libraryRef.current?.click()}
+                  >
+                    <IconImage width={17} height={17} />
+                    Choose from library
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="field">

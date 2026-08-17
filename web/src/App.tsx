@@ -76,8 +76,11 @@ function AppShell() {
           <Navigate to="/profile" replace state={{ onboarding: true }} />
         ) : (
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            {/* Capture is the landing page — the app is built around fast
+                photo capture, so an authenticated user lands here. */}
+            <Route path="/" element={<Navigate to="/capture" replace />} />
             <Route path="/capture" element={<Capture />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/history" element={<History />} />
             <Route path="/meals/:id" element={<MealDetail />} />
             <Route path="/ask" element={<Ask />} />

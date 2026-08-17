@@ -49,6 +49,15 @@ export const IconSearch = (p: P) => (
   </svg>
 );
 
+/** Speech bubble with a question mark — reads clearly as "ask a question". */
+export const IconAsk = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+    <path d="M9.8 9.3a2.2 2.2 0 0 1 3.6 1.7c0 1.3-1.6 1.5-1.6 2.6" />
+    <path d="M11.8 15.4h.01" />
+  </svg>
+);
+
 export const IconFlame = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 3s5 4 5 9a5 5 0 0 1-10 0c0-1.5.6-2.7 1.3-3.5C8 10 9 11 9 11s-.5-3 3-8Z" />

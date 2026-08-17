@@ -3,19 +3,19 @@ import { api } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { useAuth } from "../lib/auth";
 import {
+  IconAsk,
   IconCamera,
   IconHistory,
   IconHome,
   IconLogout,
-  IconSpark,
   IconUser,
 } from "./icons";
 
 const LINKS = [
-  { to: "/", label: "Dashboard", Icon: IconHome, end: true },
   { to: "/capture", label: "Capture", Icon: IconCamera, end: false },
+  { to: "/dashboard", label: "Dashboard", Icon: IconHome, end: false },
   { to: "/history", label: "History", Icon: IconHistory, end: false },
-  { to: "/ask", label: "Ask", Icon: IconSpark, end: false },
+  { to: "/ask", label: "Ask", Icon: IconAsk, end: false },
   { to: "/profile", label: "Profile", Icon: IconUser, end: false },
 ];
 
@@ -40,9 +40,6 @@ function Account() {
   const { user, signOut } = useAuth();
   return (
     <div className="account">
-      <span className="account-avatar">
-        <IconUser />
-      </span>
       <span className="account-email" title={user?.email}>
         {user?.email ?? "Signed in"}
       </span>
@@ -50,10 +47,10 @@ function Account() {
         type="button"
         className="account-logout"
         onClick={signOut}
-        title="Log out"
         aria-label="Log out"
       >
         <IconLogout />
+        <span>Log out</span>
       </button>
     </div>
   );
@@ -82,6 +79,7 @@ export function Sidebar() {
             key={to}
             to={to}
             end={end}
+            aria-label={label}
             className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
           >
             <Icon />
