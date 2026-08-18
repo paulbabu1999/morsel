@@ -63,6 +63,15 @@ def compute_stats(
     # on day 1, then diverge only as more days get logged.
     logged_days = max(1, len({_local_date(m["eaten_at"]) for m in meals}))
 
+    # Consistency signal — adherence is the strongest predictor of weight loss, and
+    # it's consistency (>3 days/week), not perfection, that matters. Count distinct
+    # days logged in the last 7 (forgiving of misses). Reuse `meals` when the window
+    # already spans a week; only the Day view needs an extra lookup.
+    wk_cutoff = (day0_local - timedelta(days=6)) + tz
+    wk_meals = ([m for m in meals if m["eaten_at"] >= wk_cutoff] if start <= wk_cutoff
+                else repo.list_meals(user_id, start=wk_cutoff, end=now, limit=1000))
+    logged_days_7d = len({_local_date(m["eaten_at"]) for m in wk_meals})
+
     # daily buckets keyed by the user's LOCAL calendar date
     buckets: dict[str, list] = {(start_local + timedelta(days=i)).date().isoformat(): [] for i in range(days)}
     for m in meals:
@@ -111,6 +120,7 @@ def compute_stats(
         "total_meals": len(meals),
         "total_calories": total_cal,
         "days_tracked": logged_days,
+        "logged_days_7d": logged_days_7d,
         "avg_calories_per_day": round(total_cal / logged_days, 1),
         "avg_protein_per_day": round(total_protein / logged_days, 1),
         "eat_out_meals": len(eat_out),

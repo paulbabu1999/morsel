@@ -276,6 +276,7 @@ class StatsResponse(BaseModel):
     total_meals: int
     total_calories: int
     days_tracked: int = 1  # distinct days with entries in the window (the avg divisor)
+    logged_days_7d: int = 0  # distinct days logged in the last 7 (consistency signal)
     avg_calories_per_day: float
     avg_protein_per_day: float
     eat_out_meals: int

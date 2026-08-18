@@ -81,9 +81,10 @@ def compute_insights(
                 "On track with calories",
                 f"You're averaging {avg:,} kcal/day {label} — right around your {goal:,} goal."))
         elif diff > 0:
-            insights.append(_ins("calorie", "watch",
-                f"~{diff:,} kcal/day over goal",
-                f"Averaging {avg:,} kcal/day {label} vs your {goal:,} target."))
+            insights.append(_ins("calorie", "info",
+                "A little above your goal",
+                f"Running about {avg:,} kcal/day {label} vs a {goal:,} goal — small trims "
+                f"(a lighter snack, one less coffee) close most of that gap."))
         else:
             insights.append(_ins("calorie", "info",
                 f"~{abs(diff):,} kcal/day under goal",
@@ -148,9 +149,11 @@ def _headline(insights: list[dict], label: str) -> str:
 def _llm_headline(insights: list[dict], label: str) -> str | None:
     findings = "; ".join(f"{i['title']}: {i['detail']}" for i in insights)
     system = (
-        "You write a single friendly, NEUTRAL one-sentence summary of someone's "
-        "food-log insights. Never judgmental or shaming about eating; be supportive "
-        "and factual. No emojis. Under 30 words."
+        "You write ONE warm, forward-looking sentence for someone tracking their "
+        "food — a gentle nudge, not a verdict. Lead with something that's going well, "
+        "then at most one small, specific, optional suggestion drawn from their own "
+        "data. Never shame, never scold, never mention 'over/under' as a failure. "
+        "Talk like a kind friend, not a coach. No emojis. Under 30 words."
     )
     return client.call_text(system, f"Findings for {label}: {findings}\nWrite the one-sentence summary.")
 

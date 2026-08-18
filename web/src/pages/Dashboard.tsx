@@ -146,6 +146,33 @@ export function Dashboard() {
   );
 }
 
+/** A quiet 7-dot consistency signal. Adherence (showing up, not perfection) is
+ *  what actually loses weight, so this celebrates days logged and never shames a
+ *  gap — no streak that "breaks". */
+function ConsistencyStrip({ days }: { days: number }) {
+  const n = Math.min(Math.max(days, 0), 7);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+      <div style={{ display: "flex", gap: 5 }}>
+        {Array.from({ length: 7 }).map((_, i) => (
+          <span
+            key={i}
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              background: i < n ? "var(--brand)" : "var(--surface-3)",
+            }}
+          />
+        ))}
+      </div>
+      <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
+        {n === 0 ? "A fresh week — log a meal to get going" : `Logged ${n} of the last 7 days`}
+      </span>
+    </div>
+  );
+}
+
 function DashboardBody({
   stats,
   period,
@@ -193,6 +220,8 @@ function DashboardBody({
 
   return (
     <>
+      <ConsistencyStrip days={stats.logged_days_7d} />
+
       {/* ---- Calorie goal + macros ---- */}
       {targets ? (
         <div className="grid two-col">

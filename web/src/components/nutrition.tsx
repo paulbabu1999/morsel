@@ -29,13 +29,14 @@ export function CalorieRing({
   const circ = 2 * Math.PI * r;
   const ratio = target > 0 ? value / target : 0;
   const over = value > target;
-  const pct = Math.round(ratio * 100);
   const dash = Math.min(ratio, 1) * circ;
   const remaining = target - value;
 
-  // Green while under, red once over the goal.
-  const from = over ? "#e66767" : "#ff9a5a";
-  const to = over ? "#ff5e7e" : "#ff5e7e";
+  // Calm warm fill; just a gentler, slightly deeper tone once over goal — never
+  // an alarm red (a single day over is noise, and shaming the number is what
+  // makes people quit).
+  const from = over ? "#E0967B" : "#F0B48C";
+  const to = over ? "#D98A5E" : "#E79070";
 
   return (
     <div className="cal-ring">
@@ -72,12 +73,11 @@ export function CalorieRing({
         <div className="cal-ring-target">of {formatNumber(target)} kcal</div>
         <div
           className="cal-ring-rem"
-          style={{ color: over ? "var(--danger)" : "var(--good)" }}
+          style={{ color: over ? "var(--text-muted)" : "var(--good)" }}
         >
           {over
             ? `${formatNumber(Math.abs(remaining))} over`
             : `${formatNumber(remaining)} left`}
-          <span className="cal-ring-pct"> · {pct}%</span>
         </div>
       </div>
       <div className="cal-ring-caption">{caption}</div>

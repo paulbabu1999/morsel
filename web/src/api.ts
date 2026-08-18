@@ -217,6 +217,8 @@ export interface StatsResponse {
   end: string;
   total_meals: number;
   total_calories: number;
+  days_tracked: number;
+  logged_days_7d: number;
   avg_calories_per_day: number;
   avg_protein_per_day: number;
   eat_out_meals: number;
