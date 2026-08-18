@@ -108,15 +108,17 @@ def analyze(
     loc = location or extraction.get("location")
     description = extraction.get("description") or _describe(mtype, items, loc, note)
 
-    # The first photo is the meal's thumbnail (the user adds the finished dish
-    # first; any extra photos are ingredient context for the analysis only).
+    # Thumbnail every photo. The first is the primary thumbnail (photo_uri, used in
+    # lists); photo_uris keeps them all for the meal's gallery.
+    thumbs = [t for t in (_thumbnail_data_url(b) for b, _mt in images) if t]
     draft = {
         "items": items,
         "meal_type": mtype,
         "location": loc,
         "note": note,
         "source": source,
-        "photo_uri": _thumbnail_data_url(images[0][0]) if images else None,
+        "photo_uri": thumbs[0] if thumbs else None,
+        "photo_uris": thumbs,
         "photo_count": len(images),
         "description": description,
         "tags": _tags(items, loc),
@@ -161,6 +163,8 @@ def build_meal(create: dict) -> dict:
         "meal_type": mtype,
         "location_text": loc,
         "photo_uri": create.get("photo_uri"),
+        "photo_uris": create.get("photo_uris")
+        or ([create["photo_uri"]] if create.get("photo_uri") else []),
         "note_text": note,
         "description": description,
         "tags": create.get("tags") or _tags(items, loc),

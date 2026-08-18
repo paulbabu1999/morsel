@@ -40,27 +40,8 @@ _NUTRIENT_FIELDS = [
 ]
 
 
-def search_food(name: str, timeout: float = 8.0) -> dict | None:
-    """Return a per-100g food_entity dict for `name`, or None if unresolved."""
-    params = {
-        "api_key": config.USDA_API_KEY,
-        "query": name,
-        "dataType": ["Foundation", "SR Legacy", "Survey (FNDDS)"],
-        "pageSize": 1,
-        "sortBy": "dataType.keyword",
-    }
-    try:
-        resp = httpx.get(f"{config.USDA_BASE_URL}/foods/search", params=params, timeout=timeout)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception:
-        return None
-
-    foods = data.get("foods") or []
-    if not foods:
-        return None
-    food = foods[0]
-
+def _parse_food(food: dict, name: str) -> dict | None:
+    """Map one FDC search hit to a per-100g food_entity dict (None if no energy)."""
     nutrients = {field: 0.0 for field in _NUTRIENT_FIELDS}
     energy_fallback = 0.0
     for fn in food.get("foodNutrients", []):
@@ -75,6 +56,8 @@ def search_food(name: str, timeout: float = 8.0) -> dict | None:
             energy_fallback = float(value)
     if not nutrients["calories"] and energy_fallback:  # 1008 missing -> Atwater
         nutrients["calories"] = energy_fallback
+    if nutrients["calories"] <= 0:  # 0-kcal hit = junk match; let the caller try the next
+        return None
 
     entry = {
         "canonical_name": (food.get("description") or name).title()[:120],
@@ -86,3 +69,37 @@ def search_food(name: str, timeout: float = 8.0) -> dict | None:
     }
     entry.update(nutrients)
     return entry
+
+
+def _query(name: str, data_types: list[str], timeout: float) -> dict | None:
+    params = {
+        "api_key": config.USDA_API_KEY,
+        "query": name,
+        "dataType": data_types,
+        "pageSize": 5,  # scan a few and skip 0-kcal junk matches
+    }
+    try:
+        resp = httpx.get(f"{config.USDA_BASE_URL}/foods/search", params=params, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return None
+    for food in (data.get("foods") or []):
+        entry = _parse_food(food, name)
+        if entry:
+            return entry
+    return None
+
+
+def search_food(name: str, timeout: float = 8.0) -> dict | None:
+    """Return a per-100g food_entity dict for `name`, or None if unresolved.
+
+    Two passes: first the curated generic datasets (Foundation / SR Legacy / Survey),
+    which give clean whole-food nutrition (a real banana, not a banana snack); then,
+    only if those miss, the huge Branded set — where packaged/branded/composed foods
+    (Planters, Popeyes, protein bars) live with full micronutrients. This resolves
+    branded foods to authoritative USDA data (sugar/fiber/sodium included) instead of
+    a macros-only LLM estimate, without letting a branded product outrank a whole food.
+    FDC reports per-100g `value` across all data types."""
+    return (_query(name, ["Foundation", "SR Legacy", "Survey (FNDDS)"], timeout)
+            or _query(name, ["Branded"], timeout))

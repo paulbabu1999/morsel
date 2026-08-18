@@ -89,7 +89,8 @@ CREATE TABLE meals (
     eaten_at        TIMESTAMP NOT NULL,
     meal_type       TEXT        NOT NULL,               -- breakfast|lunch|dinner|snack
     location_text   TEXT,
-    photo_uri       TEXT,
+    photo_uri       TEXT,                       -- primary thumbnail (first photo)
+    photo_uris      TEXT[]      NOT NULL DEFAULT '{}',  -- all photos for this meal
     note_text       TEXT,
     description     TEXT        NOT NULL DEFAULT '',     -- concatenated text used for the embedding
     tags            TEXT[]      NOT NULL DEFAULT '{}',

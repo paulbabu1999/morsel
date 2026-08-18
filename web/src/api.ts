@@ -60,6 +60,7 @@ export interface Meal {
   meal_type: MealType;
   location_text: string | null;
   photo_uri: string | null;
+  photo_uris: string[];
   note_text: string | null;
   description: string;
   tags: string[];
@@ -127,6 +128,8 @@ export interface CaptureDraft {
   note: string | null;
   source: CaptureSource;
   photo_uri: string | null;
+  photo_uris: string[];
+  photo_count: number;
   description: string;
   tags: string[];
   confidence: number;
@@ -162,6 +165,7 @@ export interface MealCreate {
   note?: string | null;
   source: CaptureSource;
   photo_uri?: string | null;
+  photo_uris?: string[] | null;
   description?: string | null;
   tags?: string[];
 }

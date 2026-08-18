@@ -33,6 +33,10 @@ _EXTRACT_SCHEMA = {
                     "protein_g": {"type": "number"},
                     "carbs_g": {"type": "number"},
                     "fat_g": {"type": "number"},
+                    "sugar_g": {"type": "number"},
+                    "fiber_g": {"type": "number"},
+                    "sodium_mg": {"type": "number"},
+                    "satfat_g": {"type": "number"},
                 },
                 "required": ["name"],
             },
@@ -48,10 +52,12 @@ _EXTRACT_SCHEMA = {
 _SYSTEM = (
     "You extract a structured meal record from a short note and/or one or more "
     "food photos. Identify each distinct food item, estimate its portion (quantity, "
-    "unit, and grams), and give rough per-item calories and macros "
-    "(protein/carbs/fat). Infer meal_type from the food and time, and location if "
-    "mentioned. Write a one-line description. Set confidence in [0,1]. Emit best "
-    "estimates; the app looks up authoritative nutrition afterward.\n"
+    "unit, and grams), and give rough per-item nutrition: calories, protein, carbs, "
+    "fat, and ALSO sugar_g, fiber_g, sodium_mg, and satfat_g (these matter — a "
+    "cookie or soda is mostly sugar, chips are high sodium; never leave them at 0 "
+    "when the food obviously contains them). Infer meal_type from the food and time, "
+    "and location if mentioned. Write a one-line description. Set confidence in "
+    "[0,1]. Emit best estimates; the app looks up authoritative nutrition afterward.\n"
     "\n"
     "MULTIPLE PHOTOS = ONE MEAL. You may be given several photos of the SAME meal: "
     "the finished dish plus close-ups of ingredients that went into it (e.g. "

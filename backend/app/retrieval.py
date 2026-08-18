@@ -16,7 +16,7 @@ from .foods import OFFICE_LOCATIONS
 
 # Columns returned for a meal (excludes embedding + tsvector, which aren't JSON-safe).
 MEAL_COLS = [
-    "id", "user_id", "eaten_at", "meal_type", "location_text", "photo_uri", "note_text",
+    "id", "user_id", "eaten_at", "meal_type", "location_text", "photo_uri", "photo_uris", "note_text",
     "description", "tags", "source", "confidence",
     "total_calories", "total_protein_g", "total_carbs_g", "total_fat_g",
     "total_fiber_g", "total_sugar_g", "total_sodium_mg", "total_satfat_g",

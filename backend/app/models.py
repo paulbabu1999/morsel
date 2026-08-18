@@ -90,7 +90,8 @@ class Meal(BaseModel):
     eaten_at: datetime
     meal_type: MealType
     location_text: Optional[str] = None
-    photo_uri: Optional[str] = None
+    photo_uri: Optional[str] = None  # primary thumbnail (first photo)
+    photo_uris: list[str] = Field(default_factory=list)  # all photos for this meal
     note_text: Optional[str] = None
     description: str = ""
     tags: list[str] = Field(default_factory=list)
@@ -131,6 +132,7 @@ class CaptureDraft(BaseModel):
     note: Optional[str] = None
     source: CaptureSource = CaptureSource.phone
     photo_uri: Optional[str] = None
+    photo_uris: list[str] = Field(default_factory=list)
     photo_count: int = 0
     description: str = ""
     tags: list[str] = Field(default_factory=list)
@@ -161,6 +163,7 @@ class MealCreate(BaseModel):
     note: Optional[str] = None
     source: CaptureSource = CaptureSource.phone
     photo_uri: Optional[str] = None
+    photo_uris: Optional[list[str]] = None
     description: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
 

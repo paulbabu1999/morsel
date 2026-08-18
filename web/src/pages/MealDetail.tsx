@@ -10,6 +10,7 @@ import {
 } from "../lib/format";
 import { ErrorState, Loading } from "../components/states";
 import { SourceBadge } from "../components/badges";
+import { PhotoGallery } from "../components/PhotoGallery";
 import { IconArrowLeft, IconImage } from "../components/icons";
 
 export function MealDetail() {
@@ -46,13 +47,23 @@ export function MealDetail() {
           <div className="detail-grid">
             {/* Left: photo + items table */}
             <div className="grid" style={{ gap: 20 }}>
-              <div className={`detail-photo${meal.photo_uri ? "" : " noimg"}`}>
-                {meal.photo_uri ? (
-                  <img src={meal.photo_uri} alt={meal.description} />
-                ) : (
-                  <IconImage width={40} height={40} />
-                )}
-              </div>
+              {(() => {
+                const photos = meal.photo_uris?.length
+                  ? meal.photo_uris
+                  : meal.photo_uri
+                    ? [meal.photo_uri]
+                    : [];
+                if (photos.length > 1) return <PhotoGallery photos={photos} alt={meal.description} />;
+                return (
+                  <div className={`detail-photo${photos[0] ? "" : " noimg"}`}>
+                    {photos[0] ? (
+                      <img src={photos[0]} alt={meal.description} />
+                    ) : (
+                      <IconImage width={40} height={40} />
+                    )}
+                  </div>
+                );
+              })()}
 
               <section className="card card-pad">
                 <div className="card-head">

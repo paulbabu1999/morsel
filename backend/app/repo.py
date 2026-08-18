@@ -37,15 +37,15 @@ def insert_meal_rows(cur, meal: dict, user_id: str) -> None:
     emb = _vec_literal(meal["description"])
     cur.execute(
         """INSERT INTO meals
-           (id, user_id, eaten_at, meal_type, location_text, photo_uri, note_text,
+           (id, user_id, eaten_at, meal_type, location_text, photo_uri, photo_uris, note_text,
             description, tags, source, confidence,
             total_calories, total_protein_g, total_carbs_g, total_fat_g,
             total_fiber_g, total_sugar_g, total_sodium_mg, total_satfat_g,
             total_iron_mg, total_calcium_mg, total_potassium_mg, embedding)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector)""",
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector)""",
         (
             meal["id"], user_id, meal["eaten_at"], meal["meal_type"], meal.get("location_text"),
-            meal.get("photo_uri"), meal.get("note_text"), meal["description"], meal.get("tags", []),
+            meal.get("photo_uri"), meal.get("photo_uris", []), meal.get("note_text"), meal["description"], meal.get("tags", []),
             meal.get("source", "phone"), meal.get("confidence", 0.9),
             meal["total_calories"], meal["total_protein_g"], meal["total_carbs_g"], meal["total_fat_g"],
             meal["total_fiber_g"], meal["total_sugar_g"], meal["total_sodium_mg"], meal["total_satfat_g"],

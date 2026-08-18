@@ -13,6 +13,7 @@ import { formatNumber, titleCase } from "../lib/format";
 import { PageHead } from "../components/ui";
 import { ErrorState } from "../components/states";
 import { SourceBadge } from "../components/badges";
+import { PhotoGallery } from "../components/PhotoGallery";
 import {
   IconCamera,
   IconCheck,
@@ -421,6 +422,7 @@ function DraftEditor({
       note: draft.note ?? null,
       source,
       photo_uri: draft.photo_uri,
+      photo_uris: draft.photo_uris,
       // datetime-local is local wall-clock; send UTC so the server stores it in
       // the same frame as server-generated times (see _normalize_eaten_at).
       eaten_at: eatenAt ? new Date(eatenAt).toISOString() : null,
@@ -613,19 +615,10 @@ function SavedMeal({ meal, onLogAnother }: { meal: Meal; onLogAnother: () => voi
         <SourceBadge source={meal.source} />
       </div>
 
-      {meal.photo_uri && (
-        <img
-          src={meal.photo_uri}
-          alt={meal.description}
-          style={{
-            width: "100%",
-            aspectRatio: "16 / 9",
-            objectFit: "cover",
-            borderRadius: "var(--r)",
-            marginBottom: 16,
-          }}
-        />
-      )}
+      <PhotoGallery
+        photos={meal.photo_uris?.length ? meal.photo_uris : meal.photo_uri ? [meal.photo_uri] : []}
+        alt={meal.description}
+      />
 
       <div style={{ overflowX: "auto" }}>
         <table className="table">
