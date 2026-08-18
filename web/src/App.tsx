@@ -35,7 +35,7 @@ export function App() {
   if (!loaded) {
     return (
       <div className="auth-boot">
-        <Loading label="Loading Morsel…" />
+        <Loading label="Loading Bite…" />
       </div>
     );
   }

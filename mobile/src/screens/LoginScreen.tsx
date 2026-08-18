@@ -92,7 +92,7 @@ export function LoginScreen() {
               </View>
             </View>
             <View>
-              <Text style={styles.brandName}>Morsel</Text>
+              <Text style={styles.brandName}>Bite</Text>
               <Text style={styles.brandSub}>food memory</Text>
             </View>
           </View>
@@ -156,7 +156,7 @@ export function LoginScreen() {
 
             <View style={styles.toggleRow}>
               <Text style={styles.toggleText}>
-                {isSignup ? 'Already have an account?' : 'New to Morsel?'}{' '}
+                {isSignup ? 'Already have an account?' : 'New to Bite?'}{' '}
               </Text>
               <TouchableOpacity onPress={toggleMode} disabled={busy} hitSlop={8}>
                 <Text style={styles.toggleLink}>{isSignup ? 'Log in' : 'Create one'}</Text>

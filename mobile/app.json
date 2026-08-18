@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Morsel",
+    "name": "Bite",
     "slug": "foodapp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,8 +10,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Morsel uses the camera to snap photos of your meals.",
-        "NSPhotoLibraryUsageDescription": "Morsel needs access to your photos to attach meal images."
+        "NSCameraUsageDescription": "Bite uses the camera to snap photos of your meals.",
+        "NSPhotoLibraryUsageDescription": "Bite needs access to your photos to attach meal images."
       }
     },
     "android": {
@@ -34,8 +34,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Morsel needs access to your photos to attach meal images.",
-          "cameraPermission": "Morsel uses the camera to snap photos of your meals."
+          "photosPermission": "Bite needs access to your photos to attach meal images.",
+          "cameraPermission": "Bite uses the camera to snap photos of your meals."
         }
       ],
       [

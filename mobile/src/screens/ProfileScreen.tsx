@@ -269,7 +269,7 @@ function ProfileForm({
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {isOnboarding ? (
           <Card style={[styles.block, styles.introCard]}>
-            <Text style={styles.introTitle}>👋 Welcome to Morsel</Text>
+            <Text style={styles.introTitle}>👋 Welcome to Bite</Text>
             <Text style={styles.introBody}>
               Tell us a bit about yourself and we'll set a daily calorie goal plus personalized nutrient
               targets. You can change these any time.

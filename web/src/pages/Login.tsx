@@ -82,7 +82,7 @@ export function Login() {
             </svg>
           </div>
           <div>
-            <div className="brand-name">Morsel</div>
+            <div className="brand-name">Bite</div>
             <div className="brand-sub">food memory</div>
           </div>
         </div>
@@ -153,7 +153,7 @@ export function Login() {
         </form>
 
         <div className="auth-toggle">
-          {isSignup ? "Already have an account?" : "New to Morsel?"}{" "}
+          {isSignup ? "Already have an account?" : "New to Bite?"}{" "}
           <button type="button" className="auth-link" onClick={toggleMode}>
             {isSignup ? "Log in" : "Create one"}
           </button>

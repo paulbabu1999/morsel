@@ -489,7 +489,7 @@ function ProfilePrompt() {
         </div>
         <div className="state-title">Set up your profile to unlock the calorie ring</div>
         <div className="state-msg">
-          Add your age, weight, and goal and Morsel will compute a daily calorie
+          Add your age, weight, and goal and Bite will compute a daily calorie
           target plus personalized nutrient goals to track against.
         </div>
         <Link to="/profile" className="btn btn-primary" style={{ marginTop: 6 }}>

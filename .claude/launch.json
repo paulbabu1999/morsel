@@ -2,9 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "morsel-web",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "web", "run", "dev"],
+      "name": "bite-web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "VITE_API_URL=https://morsel-api-9s89.onrender.com npm --prefix web run dev"
+      ],
       "port": 5173
     }
   ]

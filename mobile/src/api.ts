@@ -1,5 +1,5 @@
 /**
- * Typed API client for the Morsel backend (contract v2).
+ * Typed API client for the Bite backend (contract v2).
  * Mirrors /Users/paulbabu/Documents/Project-diet/API_CONTRACT.md exactly.
  *
  * All network calls go through `request()`, which adds a timeout and converts

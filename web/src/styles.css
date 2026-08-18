@@ -1,64 +1,64 @@
 /* =================================================================
-   Morsel — global stylesheet
-   A cohesive dark design system: tokens, layout, and components.
+   Bite — global stylesheet
+   A warm, soft, light design system: tokens, layout, and components.
    ================================================================= */
 
 /* ---------- Design tokens ---------- */
 :root {
-  /* Surfaces (app chrome runs darker than the chart surface) */
-  --bg: #0b0e14;
-  --bg-grad-1: #10141d;
-  --surface: #131824;
-  --surface-2: #1a2030;
-  --surface-3: #222a3c;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.15);
+  /* Surfaces — warm cream paper, soft raised cards */
+  --bg: #fbf7f1;
+  --bg-grad-1: #f6f0e7;
+  --surface: #ffffff;
+  --surface-2: #f6f1e9;
+  --surface-3: #efe7db;
+  --border: rgba(59, 53, 46, 0.1);
+  --border-strong: rgba(59, 53, 46, 0.18);
 
-  /* Ink */
-  --text: #eceef3;
-  --text-secondary: #aeb6c4;
-  --text-muted: #6f7889;
+  /* Ink — soft warm brown, never pure black */
+  --text: #3b352e;
+  --text-secondary: #6f675d;
+  --text-muted: #9a8f82;
 
-  /* Brand */
-  --brand: #ff8a4c;
-  --brand-2: #ff5e7e;
-  --brand-ink: #1a0f08;
-  --brand-soft: rgba(255, 138, 76, 0.14);
-  --brand-grad: linear-gradient(135deg, #ff9a5a 0%, #ff5e7e 100%);
+  /* Brand — soft, appetizing peach */
+  --brand: #e7a17c;
+  --brand-2: #e98e86;
+  --brand-ink: #ffffff;
+  --brand-soft: rgba(231, 161, 124, 0.16);
+  --brand-grad: linear-gradient(135deg, #f0b48c 0%, #e79070 100%);
 
-  /* Route palette (validated hues, stepped for dark) */
-  --route-aggregate: #3987e5;
-  --route-aggregate-soft: rgba(57, 135, 229, 0.16);
-  --route-semantic: #a78bfa;
-  --route-semantic-soft: rgba(167, 139, 250, 0.16);
-  --route-hybrid: #22c58b;
-  --route-hybrid-soft: rgba(34, 197, 139, 0.16);
+  /* Route palette (softened hues for a light bg) */
+  --route-aggregate: #4c82d6;
+  --route-aggregate-soft: rgba(76, 130, 214, 0.13);
+  --route-semantic: #9b84e0;
+  --route-semantic-soft: rgba(155, 132, 224, 0.13);
+  --route-hybrid: #46b08a;
+  --route-hybrid-soft: rgba(70, 176, 138, 0.13);
 
   /* Source badge hues */
-  --src-glasses: #a78bfa;
-  --src-phone: #3987e5;
-  --src-manual: #8b93a4;
+  --src-glasses: #9b84e0;
+  --src-phone: #4c82d6;
+  --src-manual: #9a8f82;
 
   /* Chart ink */
-  --chart-cal: #ff9a5a;
-  --chart-blue: #3987e5;
-  --chart-aqua: #22c58b;
-  --grid: rgba(255, 255, 255, 0.06);
-  --axis: #6f7889;
+  --chart-cal: #e7a17c;
+  --chart-blue: #6d9be0;
+  --chart-aqua: #5bc0a0;
+  --grid: rgba(59, 53, 46, 0.07);
+  --axis: #9a8f82;
 
   /* Status */
-  --good: #22c58b;
-  --danger: #e66767;
+  --good: #4fb98a;
+  --danger: #de8a7b;
 
-  /* Shape */
-  --r-sm: 9px;
-  --r: 13px;
-  --r-lg: 18px;
-  --r-xl: 24px;
+  /* Shape — a touch rounder for a friendlier feel */
+  --r-sm: 10px;
+  --r: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
 
-  /* Elevation */
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
-  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.45);
+  /* Elevation — soft, warm, low-contrast */
+  --shadow: 0 1px 2px rgba(59, 53, 46, 0.05), 0 10px 28px rgba(59, 53, 46, 0.07);
+  --shadow-lg: 0 24px 60px rgba(59, 53, 46, 0.12);
 
   --sidebar-w: 250px;
 }
@@ -78,29 +78,29 @@ body,
 
 body {
   margin: 0;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--text);
   background: var(--bg);
   background-image: radial-gradient(
       1200px 600px at 100% -10%,
-      rgba(255, 94, 126, 0.08),
+      rgba(231, 161, 124, 0.12),
       transparent 60%
     ),
-    radial-gradient(1000px 500px at -10% 0%, rgba(57, 135, 229, 0.08), transparent 55%);
+    radial-gradient(1000px 500px at -10% 0%, rgba(233, 142, 134, 0.08), transparent 55%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 h1,
 h2,
 h3,
 h4 {
-  font-family: "Sora", "Inter", sans-serif;
+  font-family: "Nunito", system-ui, sans-serif;
   margin: 0;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
 }
 
 a {
@@ -114,7 +114,7 @@ button {
 }
 
 ::selection {
-  background: rgba(255, 138, 76, 0.3);
+  background: rgba(231, 161, 124, 0.3);
 }
 
 /* Scrollbars */
@@ -158,7 +158,7 @@ button {
   flex-direction: column;
   gap: 6px;
   padding: 26px 18px;
-  background: linear-gradient(180deg, var(--bg-grad-1), rgba(11, 14, 20, 0.6));
+  background: linear-gradient(180deg, var(--bg-grad-1), var(--bg));
   border-right: 1px solid var(--border);
   backdrop-filter: blur(8px);
 }
@@ -177,13 +177,13 @@ button {
   background: var(--brand-grad);
   display: grid;
   place-items: center;
-  box-shadow: 0 6px 18px rgba(255, 94, 126, 0.35);
+  box-shadow: 0 6px 16px rgba(231, 161, 124, 0.32);
   flex: none;
 }
 
 .brand-name {
-  font-family: "Sora", sans-serif;
-  font-weight: 800;
+  font-family: "Nunito", sans-serif;
+  font-weight: 650;
   font-size: 20px;
   letter-spacing: -0.02em;
 }
@@ -235,7 +235,7 @@ button {
 
 .nav-link.active {
   background: var(--brand-soft);
-  color: #ffd0b3;
+  color: #b96a41;
 }
 
 .nav-link.active::before {
@@ -300,7 +300,7 @@ button {
 
 .page-title {
   font-size: clamp(24px, 3vw, 32px);
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .page-subtitle {
@@ -315,7 +315,7 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--brand);
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 8px;
 }
 
@@ -341,7 +341,7 @@ button {
 
 .card-title {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.01em;
 }
 
@@ -408,8 +408,8 @@ button {
 }
 .kpi-value {
   font-size: 30px;
-  font-weight: 800;
-  font-family: "Sora", sans-serif;
+  font-weight: 650;
+  font-family: "Nunito", sans-serif;
   margin-top: 12px;
   letter-spacing: -0.02em;
 }
@@ -458,7 +458,7 @@ button {
   background: var(--brand-grad);
   color: var(--brand-ink);
   border: none;
-  box-shadow: 0 8px 20px rgba(255, 94, 126, 0.28);
+  box-shadow: 0 8px 18px rgba(231, 161, 124, 0.28);
 }
 .btn-primary:hover {
   background: var(--brand-grad);
@@ -649,7 +649,7 @@ button {
   align-items: center;
   gap: 6px;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.02em;
   padding: 4px 10px;
   border-radius: 999px;
@@ -682,7 +682,7 @@ button {
 
 .meal-type-tag {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-secondary);
@@ -710,7 +710,7 @@ button {
   gap: 9px;
   padding: 9px 16px;
   border-radius: 999px;
-  font-weight: 800;
+  font-weight: 650;
   font-size: 13.5px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -821,9 +821,9 @@ button {
   flex-direction: column;
 }
 .macro-val {
-  font-weight: 800;
+  font-weight: 650;
   font-size: 16px;
-  font-family: "Sora", sans-serif;
+  font-family: "Nunito", sans-serif;
 }
 .macro-lbl {
   font-size: 11px;
@@ -882,7 +882,7 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 600;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
 }
@@ -898,7 +898,7 @@ button {
   text-align: right;
 }
 .table tfoot td {
-  font-weight: 800;
+  font-weight: 650;
   border-top: 2px solid var(--border-strong);
   border-bottom: none;
 }
@@ -940,7 +940,7 @@ button {
 .rank-count {
   font-size: 13px;
   color: var(--text-secondary);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   width: 26px;
   text-align: right;
@@ -972,14 +972,14 @@ button {
 }
 .mt-count {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Ask screen ---------- */
 .ask-hero {
-  background: linear-gradient(160deg, var(--surface) 0%, rgba(20, 25, 38, 0.6) 100%);
+  background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 100%);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
   padding: 26px;
@@ -1039,7 +1039,7 @@ button {
   font-size: 20px;
   line-height: 1.45;
   font-weight: 600;
-  font-family: "Sora", sans-serif;
+  font-family: "Nunito", sans-serif;
   letter-spacing: -0.01em;
 }
 .router-note {
@@ -1085,8 +1085,8 @@ button {
 }
 .fact-value {
   font-size: 18px;
-  font-weight: 800;
-  font-family: "Sora", sans-serif;
+  font-weight: 650;
+  font-family: "Nunito", sans-serif;
   margin-top: 3px;
 }
 .answer-cites {
@@ -1098,7 +1098,7 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 14px;
 }
 .cites-grid {
@@ -1132,7 +1132,7 @@ button {
   flex: none;
 }
 .rl-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 13px;
   text-transform: capitalize;
 }
@@ -1253,7 +1253,7 @@ button {
 }
 .state-title {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
 }
 .state-msg {
@@ -1313,7 +1313,7 @@ button {
 }
 .recharts-tooltip-label {
   color: var(--text) !important;
-  font-weight: 700;
+  font-weight: 600;
 }
 .recharts-tooltip-item {
   color: var(--text-secondary) !important;
@@ -1325,11 +1325,11 @@ button {
   gap: 11px;
   align-items: flex-start;
   background: var(--brand-soft);
-  border: 1px solid rgba(255, 138, 76, 0.28);
+  border: 1px solid rgba(231, 161, 124, 0.35);
   border-radius: var(--r);
   padding: 13px 15px;
   font-size: 13px;
-  color: #ffd9c2;
+  color: var(--text-secondary);
   line-height: 1.45;
 }
 .stub-note svg {
@@ -1340,7 +1340,7 @@ button {
   color: var(--brand);
 }
 .stub-note b {
-  color: #fff;
+  color: var(--text);
 }
 
 .section-gap {
@@ -1377,8 +1377,8 @@ button {
   text-align: center;
 }
 .cal-ring-value {
-  font-family: "Sora", sans-serif;
-  font-weight: 800;
+  font-family: "Nunito", sans-serif;
+  font-weight: 650;
   font-size: 38px;
   letter-spacing: -0.02em;
   line-height: 1;
@@ -1390,7 +1390,7 @@ button {
 .cal-ring-rem {
   margin-top: 6px;
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .cal-ring-pct {
   color: var(--text-muted);
@@ -1435,7 +1435,7 @@ button {
 }
 .adq-kind {
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 2px 6px;
@@ -1445,13 +1445,13 @@ button {
   border: 1px solid var(--border);
 }
 .adq-kind-limit {
-  color: #e0a0a0;
+  color: #b5544a;
   background: rgba(230, 103, 103, 0.1);
   border-color: rgba(230, 103, 103, 0.24);
 }
 .adq-amount {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .adq-unit {
@@ -1485,7 +1485,7 @@ button {
   font-size: 11.5px;
 }
 .adq-status {
-  font-weight: 700;
+  font-weight: 600;
 }
 .adq-pct {
   color: var(--text-muted);
@@ -1506,8 +1506,8 @@ button {
   padding: 12px 14px;
 }
 .target-val {
-  font-family: "Sora", sans-serif;
-  font-weight: 800;
+  font-family: "Nunito", sans-serif;
+  font-weight: 650;
   font-size: 20px;
   letter-spacing: -0.01em;
 }
@@ -1536,8 +1536,8 @@ button {
   padding: 11px 12px;
 }
 .estimate-val {
-  font-family: "Sora", sans-serif;
-  font-weight: 800;
+  font-family: "Nunito", sans-serif;
+  font-weight: 650;
   font-size: 18px;
   letter-spacing: -0.01em;
 }
@@ -1566,7 +1566,7 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 600;
   padding: 0 2px;
 }
 .item-row {
@@ -1623,7 +1623,7 @@ button {
   color: var(--text-muted);
 }
 .micro-pill-val {
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .micro-grid {
@@ -1668,7 +1668,7 @@ button {
   gap: 8px;
   padding: 11px 14px;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-secondary);
   user-select: none;
 }
@@ -1778,7 +1778,7 @@ button {
 }
 .auth-title {
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 650;
 }
 .auth-sub {
   color: var(--text-secondary);
@@ -1789,7 +1789,7 @@ button {
 .auth-error {
   background: rgba(230, 103, 103, 0.12);
   border-color: rgba(230, 103, 103, 0.3);
-  color: #ffd0d0;
+  color: #b5544a;
 }
 .auth-error svg {
   color: var(--danger);
@@ -1804,7 +1804,7 @@ button {
   background: none;
   border: none;
   color: var(--brand);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 13.5px;
   padding: 0;
 }

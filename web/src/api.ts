@@ -1,5 +1,5 @@
 /**
- * Typed API client for the Morsel backend (contract v2).
+ * Typed API client for the Bite backend (contract v2).
  *
  * All shapes mirror API_CONTRACT.md exactly. The base URL comes from
  * `VITE_API_URL` and falls back to http://localhost:8000 for local dev.

@@ -67,7 +67,7 @@ export function Sidebar() {
           </svg>
         </div>
         <div>
-          <div className="brand-name">Morsel</div>
+          <div className="brand-name">Bite</div>
           <div className="brand-sub">food memory</div>
         </div>
       </div>

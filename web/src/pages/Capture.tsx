@@ -98,7 +98,7 @@ export function Capture() {
       <PageHead
         eyebrow="Log"
         title="Capture a meal"
-        subtitle="Snap a photo and describe what you ate. Morsel analyzes it into an editable draft — tweak the items, then confirm to save with full nutrition."
+        subtitle="Snap a photo and describe what you ate. Bite analyzes it into an editable draft — tweak the items, then confirm to save with full nutrition."
       />
 
       <div className="stub-note" style={{ marginBottom: 22 }}>

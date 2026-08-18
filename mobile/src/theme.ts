@@ -1,52 +1,52 @@
 /**
- * Morsel design tokens — a single cohesive palette + spacing/typography scale
+ * Bite design tokens — a single cohesive palette + spacing/typography scale
  * so every screen reads as one app.
  */
 
 export const colors = {
   // Surfaces
-  bg: '#F6F5F1', // warm paper
+  bg: '#FBF7F1', // warm paper
   surface: '#FFFFFF',
-  surfaceAlt: '#F1EFE9',
-  border: '#E8E5DC',
+  surfaceAlt: '#F6F1E9',
+  border: '#ECE3D6',
 
   // Text
-  text: '#1B1D1A',
-  textMuted: '#6C7268',
-  textFaint: '#9AA096',
+  text: '#3B352E',
+  textMuted: '#8B8175',
+  textFaint: '#B4AA9C',
 
   // Brand — warm, appetizing tangerine
-  primary: '#E4572E',
-  primaryDark: '#C7431F',
-  primarySoft: '#FBE7DF',
+  primary: '#E7A17C',
+  primaryDark: '#D98A5E',
+  primarySoft: '#FBECE1',
   onPrimary: '#FFFFFF',
 
   // Macro accents
-  calories: '#E4572E',
-  protein: '#2E7D5B',
-  carbs: '#C9902B',
-  fat: '#B5562E',
+  calories: '#E7A17C',
+  protein: '#5FA980',
+  carbs: '#D9A64E',
+  fat: '#D98A5E',
 
   // Route badges (the "AI platform" story)
-  aggregate: '#2563EB',
-  aggregateSoft: '#E1EBFF',
-  semantic: '#7C3AED',
-  semanticSoft: '#EEE6FF',
-  hybrid: '#0F9488',
-  hybridSoft: '#D9F2EF',
+  aggregate: '#4C82D6',
+  aggregateSoft: '#E7EEFB',
+  semantic: '#9B84E0',
+  semanticSoft: '#EFEAFB',
+  hybrid: '#46B08A',
+  hybridSoft: '#E0F2EC',
 
   // Source badges
-  phone: '#3B7A57',
-  phoneSoft: '#E1F0E8',
-  glasses: '#7C3AED',
-  glassesSoft: '#EEE6FF',
-  manual: '#6C7268',
-  manualSoft: '#EDEBE4',
+  phone: '#4C82D6',
+  phoneSoft: '#E7EEFB',
+  glasses: '#9B84E0',
+  glassesSoft: '#EFEAFB',
+  manual: '#8B8175',
+  manualSoft: '#EFEAE1',
 
   // Feedback
-  danger: '#C0392B',
-  dangerSoft: '#FBE4E1',
-  success: '#2E7D5B',
+  danger: '#D9776A',
+  dangerSoft: '#F8E6E2',
+  success: '#5FA980',
 } as const;
 
 export const spacing = {

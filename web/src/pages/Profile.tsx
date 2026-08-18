@@ -75,8 +75,8 @@ export function Profile() {
         title={isOnboarding ? "Set up your profile" : "Your profile"}
         subtitle={
           isOnboarding
-            ? "Tell Morsel a bit about you and it will compute a personalized daily calorie goal and nutrient targets to track against."
-            : "Your details drive the calorie ring and nutrition targets across the app. Update them anytime and Morsel will recompute."
+            ? "Tell Bite a bit about you and it will compute a personalized daily calorie goal and nutrient targets to track against."
+            : "Your details drive the calorie ring and nutrition targets across the app. Update them anytime and Bite will recompute."
         }
       />
 

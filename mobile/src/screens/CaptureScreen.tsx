@@ -277,7 +277,7 @@ function CaptureForm(props: {
         <SegmentButton label="🕶️  Glasses" active={source === 'glasses'} onPress={() => props.onSource('glasses')} />
       </View>
       <Text style={styles.hint}>
-        Morsel is capture-source agnostic. Photos come from your phone today; the same pipeline accepts a
+        Bite is capture-source agnostic. Photos come from your phone today; the same pipeline accepts a
         stream from AI glasses.
       </Text>
 
