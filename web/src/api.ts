@@ -154,6 +154,11 @@ export interface MealItemInput {
   quantity: number;
   unit?: string | null;
   grams?: number | null;
+  /**
+   * Calorie anchor for the item. The backend uses it to sanity-check the
+   * resolved density (e.g. raw-vs-cooked), so the editor forwards it when known.
+   */
+  calories?: number | null;
 }
 
 /** Body for POST /meals. */
@@ -321,6 +326,25 @@ interface RequestOptions {
   redirectOn401?: boolean;
 }
 
+/* ------------------------------------------------------------------ *
+ * Transient-failure retry policy
+ *
+ * The backend runs on a Render free-tier box that cold-starts (~30s) after
+ * idling, so a first request can time out or bounce off Render's proxy with a
+ * 502/503/504 while the container spins up. We retry those transient failures
+ * with exponential backoff and give each attempt a long (45s) timeout so a
+ * single cold start can ride through. 4xx (auth/validation) and normal 2xx
+ * responses are never retried.
+ * ------------------------------------------------------------------ */
+
+// Backoff before each retry. Three delays => up to 3 retries (4 attempts total).
+const RETRY_DELAYS_MS = [800, 1600, 3200];
+const REQUEST_TIMEOUT_MS = 45_000; // headroom over a ~30s Render cold start
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -336,42 +360,74 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}${path}`, { ...init, headers });
-  } catch {
-    // Network-level failure — almost always "backend not running".
-    throw new ApiError(
+  const unreachable = () =>
+    new ApiError(
       `Can't reach the backend at ${API_URL}. Start it on :8000 and try again.`,
     );
-  }
 
-  if (res.status === 401 && redirectOn401) {
-    // Expired / invalidated token: drop it and send the user back to login.
-    clearToken();
-    if (
-      typeof window !== "undefined" &&
-      window.location.pathname !== "/login"
-    ) {
-      window.location.assign("/login");
-    }
-    throw new ApiError("Your session has expired. Please log in again.", 401);
-  }
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    const canRetry = attempt < RETRY_DELAYS_MS.length;
 
-  if (!res.ok) {
-    let detail = `${res.status} ${res.statusText}`;
+    // Per-attempt timeout: lets a cold start complete, but still aborts a truly
+    // hung socket so it surfaces as a retryable "network/timeout" error.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    let res: Response;
     try {
-      const body = await res.json();
-      if (body?.detail) detail = String(body.detail);
+      res = await fetch(`${API_URL}${path}`, {
+        ...init,
+        headers,
+        signal: controller.signal,
+      });
     } catch {
-      /* non-JSON error body — keep the status text */
+      // Network-level failure or timeout abort — transient. Back off and retry
+      // while attempts remain; otherwise surface the standard unreachable error.
+      clearTimeout(timer);
+      if (canRetry) {
+        await sleep(RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      throw unreachable();
     }
-    throw new ApiError(detail, res.status);
+    clearTimeout(timer);
+
+    // Render cold-start / transient gateway error: back off and retry.
+    if (RETRYABLE_STATUS.has(res.status) && canRetry) {
+      await sleep(RETRY_DELAYS_MS[attempt]);
+      continue;
+    }
+
+    if (res.status === 401 && redirectOn401) {
+      // Expired / invalidated token: drop it and send the user back to login.
+      clearToken();
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
+        window.location.assign("/login");
+      }
+      throw new ApiError("Your session has expired. Please log in again.", 401);
+    }
+
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const body = await res.json();
+        if (body?.detail) detail = String(body.detail);
+      } catch {
+        /* non-JSON error body — keep the status text */
+      }
+      throw new ApiError(detail, res.status);
+    }
+
+    // 204 / empty bodies
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
   }
 
-  // 204 / empty bodies
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // The loop always returns or throws above; this satisfies the type checker.
+  throw unreachable();
 }
 
 function toQuery(params: Record<string, string | number | undefined | null>): string {
@@ -401,6 +457,14 @@ export interface CaptureInput {
   meal_type?: MealType | "";
   location?: string;
   source?: CaptureSource;
+}
+
+/**
+ * Fire-and-forget ping to wake the (Render free-tier) backend before the user
+ * reaches a real request. Cheap, unauthenticated, and never throws.
+ */
+export function warmup(): void {
+  fetch(`${API_URL}/health`).catch(() => {});
 }
 
 export const api = {
@@ -485,6 +549,32 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    }),
+
+  /**
+   * Re-estimate the current (edited) draft from a plain-language correction —
+   * e.g. "the dal is cooked, ~200 cal" or "only 2 rotis". Returns a fresh
+   * CaptureDraft (same shape as analyze); no DB write.
+   */
+  refineCapture: (input: {
+    items: {
+      name: string;
+      quantity: number;
+      unit?: string | null;
+      grams?: number | null;
+      calories?: number | null;
+    }[];
+    correction: string;
+    meal_type?: MealType;
+    location?: string | null;
+    note?: string | null;
+    source: CaptureSource;
+    photo_uris?: string[] | null;
+  }) =>
+    request<CaptureDraft>("/capture/refine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
     }),
 
   query: (question: string) =>

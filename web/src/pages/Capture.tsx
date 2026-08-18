@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { ApiError, api } from "../api";
+import { ApiError, api, warmup } from "../api";
 import type {
   CaptureDraft,
   CaptureSource,
@@ -33,10 +33,70 @@ interface EditItem {
   name: string;
   quantity: string;
   unit: string;
+  /**
+   * Density anchors carried from the analyzed draft. They scale with quantity
+   * edits and reset to null on a name change (forcing a fresh backend
+   * re-resolve); both are forwarded on save + refine.
+   */
+  grams: number | null;
+  calories: number | null;
 }
 
 let keySeq = 0;
 const nextKey = () => `row-${keySeq++}`;
+
+/** Map draft items to editable rows, seeding the grams/calories anchors. */
+function toEditItems(draft: CaptureDraft): EditItem[] {
+  return draft.items.map((it) => ({
+    key: nextKey(),
+    name: it.canonical_name,
+    quantity: String(it.quantity),
+    unit: it.unit ?? "",
+    grams: it.grams,
+    calories: it.calories,
+  }));
+}
+
+/* ------------------------------------------------------------------ *
+ * In-progress draft persistence
+ *
+ * The analyzed draft (and the surrounding form state) would otherwise be lost
+ * when the user navigates away from /capture and back. We stash it in
+ * localStorage — the draft already embeds photo_uris (data URLs), so photos
+ * survive too — and clear it on a successful save or an explicit reset.
+ * ------------------------------------------------------------------ */
+
+const CAPTURE_DRAFT_KEY = "bite_capture_draft";
+
+interface PersistedCapture {
+  draft: CaptureDraft | null;
+  note: string;
+  mealType: MealType | "";
+  location: string;
+  source: CaptureSource;
+  eatenAt: string;
+}
+
+function loadPersistedCapture(): PersistedCapture | null {
+  try {
+    const raw = localStorage.getItem(CAPTURE_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedCapture;
+    // Guard against a malformed / stale-schema blob crashing hydration.
+    if (parsed.draft && !Array.isArray(parsed.draft.items)) parsed.draft = null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedCapture(): void {
+  try {
+    localStorage.removeItem(CAPTURE_DRAFT_KEY);
+  } catch {
+    /* storage disabled — nothing to clear */
+  }
+}
 
 /** Format a Date as the local "YYYY-MM-DDTHH:mm" a datetime-local input expects. */
 function toLocalInputValue(d: Date) {
@@ -45,18 +105,48 @@ function toLocalInputValue(d: Date) {
 }
 
 export function Capture() {
+  // Rehydrate a draft-in-progress (if any) once, before seeding state below.
+  const persisted = useMemo(() => loadPersistedCapture(), []);
+
   const [photos, setPhotos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
-  const [note, setNote] = useState("");
-  const [source, setSource] = useState<CaptureSource>("phone");
-  const [mealType, setMealType] = useState<MealType | "">("");
-  const [location, setLocation] = useState("");
-  const [eatenAt, setEatenAt] = useState<string>(() => toLocalInputValue(new Date()));
+  const [note, setNote] = useState(() => persisted?.note ?? "");
+  const [source, setSource] = useState<CaptureSource>(() => persisted?.source ?? "phone");
+  const [mealType, setMealType] = useState<MealType | "">(() => persisted?.mealType ?? "");
+  const [location, setLocation] = useState(() => persisted?.location ?? "");
+  const [eatenAt, setEatenAt] = useState<string>(
+    () => persisted?.eatenAt ?? toLocalInputValue(new Date()),
+  );
 
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<CaptureDraft | null>(null);
+  const [draft, setDraft] = useState<CaptureDraft | null>(() => persisted?.draft ?? null);
   const [saved, setSaved] = useState<Meal | null>(null);
+
+  // Warm the (Render free-tier) backend the moment the user lands on Capture,
+  // so a cold box is already spinning up before they hit Analyze.
+  useEffect(() => {
+    warmup();
+  }, []);
+
+  // Persist the in-progress draft + form state whenever it changes, so it
+  // survives navigating away and back. Only write once there's a draft.
+  useEffect(() => {
+    if (!draft) return;
+    try {
+      localStorage.setItem(
+        CAPTURE_DRAFT_KEY,
+        JSON.stringify({ draft, note, mealType, location, source, eatenAt }),
+      );
+    } catch {
+      /* storage disabled / over quota — the draft just won't persist */
+    }
+  }, [draft, note, mealType, location, source, eatenAt]);
+
+  // A confirmed save is the end of this draft's life — drop the stashed copy.
+  useEffect(() => {
+    if (saved) clearPersistedCapture();
+  }, [saved]);
   // Camera (capture="environment" = rear camera on phones) vs. library (plain,
   // multi-select) pickers; both append to the photo list.
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -64,6 +154,8 @@ export function Capture() {
 
   function addPhotos(list: FileList | null) {
     if (!list || list.length === 0) return;
+    // A photo means Analyze is imminent — start waking a cold box now.
+    warmup();
     const added = Array.from(list);
     setPhotos((p) => [...p, ...added]);
     setPreviews((pv) => [...pv, ...added.map((f) => URL.createObjectURL(f))]);
@@ -115,6 +207,7 @@ export function Capture() {
     setDraft(null);
     setSaved(null);
     setError(null);
+    clearPersistedCapture();
   }
 
   return (
@@ -340,6 +433,7 @@ export function Capture() {
               source={source}
               eatenAt={eatenAt}
               onSaved={setSaved}
+              onRefined={setDraft}
             />
           )}
           {!error && !saved && !draft && (
@@ -367,50 +461,116 @@ export function Capture() {
 
 /* ---------------- Draft editor (step 2) ---------------- */
 function DraftEditor({
-  draft,
+  draft: initialDraft,
   source,
   eatenAt,
   onSaved,
+  onRefined,
 }: {
   draft: CaptureDraft;
   source: CaptureSource;
   eatenAt: string;
   onSaved: (m: Meal) => void;
+  /** Lift a refined draft up so the parent can re-render totals + persist it. */
+  onRefined?: (d: CaptureDraft) => void;
 }) {
-  const [items, setItems] = useState<EditItem[]>(() =>
-    draft.items.map((it) => ({
-      key: nextKey(),
-      name: it.canonical_name,
-      quantity: String(it.quantity),
-      unit: it.unit ?? "",
-    })),
-  );
-  const [mealType, setMealType] = useState<MealType>(draft.meal_type);
-  const [location, setLocation] = useState(draft.location ?? "");
+  // The working draft: seeded from the prop, then replaced in place by a
+  // natural-language refine. Totals/tags/notes below read from this copy.
+  const [draft, setDraft] = useState<CaptureDraft>(initialDraft);
+  const [items, setItems] = useState<EditItem[]>(() => toEditItems(initialDraft));
+  const [mealType, setMealType] = useState<MealType>(initialDraft.meal_type);
+  const [location, setLocation] = useState(initialDraft.location ?? "");
   const [saving, setSaving] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [correction, setCorrection] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   function updateItem(key: string, patch: Partial<EditItem>) {
     setItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
+  function changeName(key: string, name: string) {
+    // A new name invalidates the carried anchors — null them so the backend
+    // re-resolves grams/calories from scratch.
+    setItems((rows) =>
+      rows.map((r) =>
+        r.key === key ? { ...r, name, grams: null, calories: null } : r,
+      ),
+    );
+  }
+  function changeQuantity(key: string, nextQty: string) {
+    setItems((rows) =>
+      rows.map((r) => {
+        if (r.key !== key) return r;
+        const oldQ = Number(r.quantity);
+        const newQ = Number(nextQty);
+        // Scale the anchors proportionally so per-unit density stays constant.
+        // Skip when either quantity is non-numeric or would divide by zero.
+        const scalable =
+          Number.isFinite(oldQ) && oldQ > 0 && Number.isFinite(newQ) && newQ > 0;
+        const factor = scalable ? newQ / oldQ : 1;
+        return {
+          ...r,
+          quantity: nextQty,
+          grams: r.grams != null ? r.grams * factor : r.grams,
+          calories: r.calories != null ? r.calories * factor : r.calories,
+        };
+      }),
+    );
+  }
   function removeItem(key: string) {
     setItems((rows) => rows.filter((r) => r.key !== key));
   }
   function addItem() {
-    setItems((rows) => [...rows, { key: nextKey(), name: "", quantity: "1", unit: "" }]);
+    setItems((rows) => [
+      ...rows,
+      { key: nextKey(), name: "", quantity: "1", unit: "", grams: null, calories: null },
+    ]);
   }
 
-  async function save() {
-    const cleaned = items
+  /** Build the per-item payload (name/qty/unit + grams/calories anchors). */
+  function itemsPayload() {
+    return items
       .map((r) => {
         const q = Number(r.quantity);
         return {
           name: r.name.trim(),
           quantity: q > 0 ? q : 1, // reject 0 / negative / NaN
           unit: r.unit.trim() || null,
+          grams: r.grams,
+          calories: r.calories,
         };
       })
       .filter((r) => r.name);
+  }
+
+  async function refine() {
+    const text = correction.trim();
+    if (!text || refining) return;
+    setRefining(true);
+    setErr(null);
+    try {
+      const next = await api.refineCapture({
+        items: itemsPayload(),
+        correction: text,
+        meal_type: mealType,
+        location: location.trim() || null,
+        note: draft.note ?? null,
+        source,
+        photo_uris: draft.photo_uris,
+      });
+      setDraft(next);
+      setItems(toEditItems(next));
+      setCorrection("");
+      onRefined?.(next);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  async function save() {
+    const cleaned = itemsPayload();
     if (cleaned.length === 0) {
       setErr("Add at least one item before saving.");
       return;
@@ -506,7 +666,7 @@ function DraftEditor({
             <input
               className="input"
               value={it.name}
-              onChange={(e) => updateItem(it.key, { name: e.target.value })}
+              onChange={(e) => changeName(it.key, e.target.value)}
               placeholder="e.g. chicken burrito"
               aria-label="Item name"
             />
@@ -516,7 +676,7 @@ function DraftEditor({
               min={0}
               step="0.25"
               value={it.quantity}
-              onChange={(e) => updateItem(it.key, { quantity: e.target.value })}
+              onChange={(e) => changeQuantity(it.key, e.target.value)}
               aria-label="Quantity"
             />
             <input
@@ -540,6 +700,34 @@ function DraftEditor({
         <button type="button" className="btn btn-ghost add-item" onClick={addItem}>
           <IconPlus width={16} height={16} />
           Add item
+        </button>
+      </div>
+
+      {/* Natural-language correction — re-estimates the whole draft in one shot. */}
+      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+        <input
+          className="input"
+          style={{ flex: 1 }}
+          value={correction}
+          onChange={(e) => setCorrection(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              refine();
+            }
+          }}
+          placeholder="Not right? e.g. 'the dal is cooked, ~200 cal' or 'only 2 rotis'"
+          aria-label="Describe a correction"
+          disabled={refining}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={refine}
+          disabled={refining || !correction.trim()}
+        >
+          <IconSpark width={16} height={16} />
+          {refining ? "Fixing…" : "Fix it"}
         </button>
       </div>
 
