@@ -121,6 +121,8 @@ export interface CaptureDraft {
   note: string | null;
   source: CaptureSource;
   photo_uri: string | null;
+  /** How many photos the backend analyzed for this draft (>=1 when photos sent). */
+  photo_count?: number;
   description: string;
   tags: string[];
   confidence: number;
@@ -518,7 +520,8 @@ export function getMeal(id: string): Promise<Meal> {
 }
 
 export interface AnalyzePayload {
-  photoUri?: string | null;
+  /** One meal, one or more photos (finished dish + optional ingredient shots). */
+  photoUris?: string[];
   note?: string;
   meal_type?: MealType;
   location?: string;
@@ -526,19 +529,21 @@ export interface AnalyzePayload {
 }
 
 /**
- * Step 1 of capture — analyze a photo/note into an editable draft. Multipart so
- * the image can ride along as a React Native file object `{ uri, name, type }`.
- * The backend does NOT write to the DB here; the user edits the draft, then
- * `createMeal()` persists it.
+ * Step 1 of capture — analyze photos/note into an editable draft. Multipart so
+ * each image can ride along as a React Native file object `{ uri, name, type }`.
+ * Every selected photo is appended under the repeated `photos` field (the
+ * backend also accepts a single legacy `photo` field). The backend does NOT
+ * write to the DB here; the user edits the draft, then `createMeal()` persists it.
  */
 export function analyzeCapture(payload: AnalyzePayload): Promise<CaptureDraft> {
   const form = new FormData();
-  if (payload.photoUri) {
-    const name = payload.photoUri.split('/').pop() || 'photo.jpg';
+  for (const uri of payload.photoUris ?? []) {
+    const name = uri.split('/').pop() || 'photo.jpg';
     const ext = /\.(\w+)$/.exec(name)?.[1]?.toLowerCase();
     const type = ext ? `image/${ext === 'jpg' ? 'jpeg' : ext}` : 'image/jpeg';
-    // RN FormData file shape — TS doesn't model this, hence the cast.
-    form.append('photo', { uri: payload.photoUri, name, type } as unknown as Blob);
+    // RN FormData file shape — TS doesn't model this, hence the cast. Repeating
+    // the `photos` key sends every image as its own multipart part.
+    form.append('photos', { uri, name, type } as unknown as Blob);
   }
   if (payload.note) form.append('note', payload.note);
   if (payload.meal_type) form.append('meal_type', payload.meal_type);

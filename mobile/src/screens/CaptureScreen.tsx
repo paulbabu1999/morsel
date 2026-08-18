@@ -45,10 +45,13 @@ interface EditItem {
 
 export function CaptureScreen() {
   const [source, setSource] = useState<SourceOption>('phone');
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageUris, setImageUris] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [mealType, setMealType] = useState<MealType | undefined>(undefined);
   const [location, setLocation] = useState('');
+  // Chosen log time. `null` means "now" — we resolve a fresh `new Date()` on save
+  // so an unedited draft is stamped at save time, not when the screen mounted.
+  const [eatenAt, setEatenAt] = useState<Date | null>(null);
 
   const [analyzing, setAnalyzing] = useState(false);
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
@@ -63,6 +66,8 @@ export function CaptureScreen() {
 
   const nextKey = () => `new-${keyCounter.current++}`;
 
+  // Camera captures one shot at a time (keeps allowsEditing so the user can crop);
+  // each is appended to the meal's photo list.
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
@@ -74,9 +79,11 @@ export function CaptureScreen() {
       allowsEditing: true,
       quality: 0.7,
     });
-    if (!res.canceled) setImageUri(res.assets[0].uri);
+    if (!res.canceled) setImageUris((prev) => [...prev, res.assets[0].uri]);
   };
 
+  // The library allows multi-select. `allowsEditing` is mutually exclusive with
+  // `allowsMultipleSelection` (SDK 57), so we drop cropping here and append all.
   const pickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -85,17 +92,24 @@ export function CaptureScreen() {
     }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
+      allowsMultipleSelection: true,
       quality: 0.7,
     });
-    if (!res.canceled) setImageUri(res.assets[0].uri);
+    if (!res.canceled) setImageUris((prev) => [...prev, ...res.assets.map((a) => a.uri)]);
   };
 
+  const removePhoto = (index: number) => {
+    setImageUris((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearPhotos = () => setImageUris([]);
+
   const resetAll = () => {
-    setImageUri(null);
+    setImageUris([]);
     setNote('');
     setMealType(undefined);
     setLocation('');
+    setEatenAt(null);
     setDraft(null);
     setItems([]);
     setSaved(null);
@@ -109,7 +123,7 @@ export function CaptureScreen() {
   };
 
   const analyze = async () => {
-    if (!note.trim() && !imageUri) {
+    if (!note.trim() && imageUris.length === 0) {
       Alert.alert('Add something', 'Add a note describing what you ate (or attach a photo).');
       return;
     }
@@ -117,7 +131,7 @@ export function CaptureScreen() {
     setError(null);
     try {
       const d = await analyzeCapture({
-        photoUri: source === 'phone' ? imageUri : null,
+        photoUris: source === 'phone' ? imageUris : [],
         note: note.trim() || undefined,
         meal_type: mealType,
         location: location.trim() || undefined,
@@ -176,6 +190,9 @@ export function CaptureScreen() {
         note: note.trim() || null,
         source: source as CaptureSource,
         photo_uri: draft?.photo_uri ?? null,
+        // `null` means "now": resolve a fresh timestamp at save time. A chosen
+        // wall-clock Date is sent as UTC ISO; the backend normalizes to naive UTC.
+        eaten_at: (eatenAt ?? new Date()).toISOString(),
       });
       setSaved(meal);
     } catch (e) {
@@ -226,19 +243,22 @@ export function CaptureScreen() {
           ) : (
             <CaptureForm
               source={source}
-              imageUri={imageUri}
+              imageUris={imageUris}
               note={note}
               mealType={mealType}
               location={location}
+              eatenAt={eatenAt}
               analyzing={analyzing}
               error={error}
               onSource={setSource}
               onNote={setNote}
               onMealType={setMealType}
               onLocation={setLocation}
+              onEatenAt={setEatenAt}
               onTakePhoto={takePhoto}
               onPickImage={pickImage}
-              onClearPhoto={() => setImageUri(null)}
+              onRemovePhoto={removePhoto}
+              onClearPhotos={clearPhotos}
               onAnalyze={analyze}
             />
           )}
@@ -253,22 +273,25 @@ export function CaptureScreen() {
 // ---------------------------------------------------------------------------
 function CaptureForm(props: {
   source: SourceOption;
-  imageUri: string | null;
+  imageUris: string[];
   note: string;
   mealType: MealType | undefined;
   location: string;
+  eatenAt: Date | null;
   analyzing: boolean;
   error: string | null;
   onSource: (s: SourceOption) => void;
   onNote: (v: string) => void;
   onMealType: (v: MealType | undefined) => void;
   onLocation: (v: string) => void;
+  onEatenAt: (v: Date | null) => void;
   onTakePhoto: () => void;
   onPickImage: () => void;
-  onClearPhoto: () => void;
+  onRemovePhoto: (index: number) => void;
+  onClearPhotos: () => void;
   onAnalyze: () => void;
 }) {
-  const { source, imageUri, note, mealType, location, analyzing, error } = props;
+  const { source, imageUris, note, mealType, location, eatenAt, analyzing, error } = props;
   return (
     <>
       <SectionTitle>Capture source</SectionTitle>
@@ -283,11 +306,35 @@ function CaptureForm(props: {
 
       {source === 'phone' ? (
         <Card style={styles.block}>
-          {imageUri ? (
+          {imageUris.length > 0 ? (
             <View>
-              <Image source={{ uri: imageUri }} style={styles.preview} resizeMode="cover" />
-              <TouchableOpacity onPress={props.onClearPhoto} style={styles.clearPhoto}>
-                <Text style={styles.clearPhotoText}>Remove photo</Text>
+              <Text style={styles.photoCount}>
+                {imageUris.length} photo{imageUris.length === 1 ? '' : 's'} · the dish + any ingredients
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.thumbRow}
+              >
+                {imageUris.map((uri, i) => (
+                  <View key={`${uri}-${i}`} style={styles.thumbWrap}>
+                    <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
+                    <TouchableOpacity
+                      onPress={() => props.onRemovePhoto(i)}
+                      style={styles.thumbRemove}
+                      hitSlop={8}
+                    >
+                      <Text style={styles.thumbRemoveText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.photoActionsRow}>
+                <Button title="📸 Take photo" onPress={props.onTakePhoto} variant="secondary" style={styles.photoActionBtn} />
+                <Button title="🖼️ Add from library" onPress={props.onPickImage} variant="secondary" style={styles.photoActionBtn} />
+              </View>
+              <TouchableOpacity onPress={props.onClearPhotos} style={styles.clearPhoto}>
+                <Text style={styles.clearPhotoText}>Remove all photos</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -339,6 +386,10 @@ function CaptureForm(props: {
         ))}
       </View>
 
+      <SectionTitle style={styles.sectionSpacing}>When</SectionTitle>
+      <Text style={styles.hint}>Defaults to now — set it back to log an earlier meal.</Text>
+      <WhenPicker value={eatenAt} onChange={props.onEatenAt} />
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Button title="Analyze meal" onPress={props.onAnalyze} loading={analyzing} style={styles.submit} />
@@ -374,6 +425,9 @@ function DraftEditor(props: {
       <Card style={[styles.block, styles.extractorCard]}>
         <Text style={styles.extractorLabel}>Draft · how this was extracted</Text>
         <Text style={styles.extractorNote}>{draft.extraction_note}</Text>
+        {draft.photo_count && draft.photo_count > 1 ? (
+          <Text style={styles.extractorSub}>Combined {draft.photo_count} photos into one meal.</Text>
+        ) : null}
         <Text style={styles.extractorSub}>{draft.extractor}</Text>
       </Card>
 
@@ -541,6 +595,79 @@ function MealTypeChip({ label, active, onPress }: { label: string; active: boole
   );
 }
 
+// ---------------------------------------------------------------------------
+// "When" picker — plain-RN fallback (no @react-native-community/datetimepicker
+// dependency, which would need a native rebuild). Quick presets plus day/hour/
+// minute steppers, all yielding a JS Date the caller turns into an ISO string.
+// ---------------------------------------------------------------------------
+const MS_MIN = 60_000;
+const MS_HOUR = 60 * MS_MIN;
+const MS_DAY = 24 * MS_HOUR;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Human label like "Today, 2:45 PM" / "Yesterday, 9:05 AM" / "Aug 12, 7:30 PM". */
+function formatWhen(d: Date): string {
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - MS_DAY);
+  const day =
+    d.toDateString() === today.toDateString()
+      ? 'Today'
+      : d.toDateString() === yesterday.toDateString()
+        ? 'Yesterday'
+        : `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  return `${day}, ${h}:${mm} ${ampm}`;
+}
+
+function WhenPicker({ value, onChange }: { value: Date | null; onChange: (d: Date | null) => void }) {
+  // `null` == "now"; show a live now for display and as the base for edits.
+  const effective = value ?? new Date();
+  const isNow = value === null;
+  const preset = (msAgo: number) => onChange(new Date(Date.now() - msAgo));
+  const shift = (ms: number) => onChange(new Date(effective.getTime() + ms));
+  const shiftDay = (days: number) => {
+    const d = new Date(effective);
+    d.setDate(d.getDate() + days);
+    onChange(d);
+  };
+  return (
+    <View>
+      <View style={styles.whenSummaryRow}>
+        <Text style={styles.whenSummary}>{formatWhen(effective)}</Text>
+        {isNow ? <Text style={styles.whenNowTag}>now</Text> : null}
+      </View>
+      <View style={styles.mealTypeRow}>
+        <MealTypeChip label="Now" active={isNow} onPress={() => onChange(null)} />
+        <MealTypeChip label="1h ago" active={false} onPress={() => preset(MS_HOUR)} />
+        <MealTypeChip label="2h ago" active={false} onPress={() => preset(2 * MS_HOUR)} />
+        <MealTypeChip label="Yesterday" active={false} onPress={() => preset(MS_DAY)} />
+      </View>
+      <View style={styles.stepperRow}>
+        <Stepper label="Day" onMinus={() => shiftDay(-1)} onPlus={() => shiftDay(1)} />
+        <Stepper label="Hour" onMinus={() => shift(-MS_HOUR)} onPlus={() => shift(MS_HOUR)} />
+        <Stepper label="Min" onMinus={() => shift(-5 * MS_MIN)} onPlus={() => shift(5 * MS_MIN)} />
+      </View>
+    </View>
+  );
+}
+
+function Stepper({ label, onMinus, onPlus }: { label: string; onMinus: () => void; onPlus: () => void }) {
+  return (
+    <View style={styles.stepper}>
+      <TouchableOpacity onPress={onMinus} style={styles.stepBtn} hitSlop={6} activeOpacity={0.7}>
+        <Text style={styles.stepBtnText}>−</Text>
+      </TouchableOpacity>
+      <Text style={styles.stepLabel}>{label}</Text>
+      <TouchableOpacity onPress={onPlus} style={styles.stepBtn} hitSlop={6} activeOpacity={0.7}>
+        <Text style={styles.stepBtnText}>＋</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
@@ -557,9 +684,68 @@ const styles = StyleSheet.create({
 
   photoButtons: { gap: spacing.md },
   photoBtn: {},
-  preview: { width: '100%', height: 220, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
   clearPhoto: { marginTop: spacing.md, alignSelf: 'center' },
   clearPhotoText: { color: colors.danger, fontSize: font.small, fontWeight: '700' },
+
+  // multi-photo thumbnails
+  photoCount: { fontSize: font.tiny, color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm },
+  thumbRow: { gap: spacing.sm, paddingRight: spacing.sm },
+  thumbWrap: { position: 'relative' },
+  thumb: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
+  thumbRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  thumbRemoveText: { color: '#fff', fontSize: font.tiny, fontWeight: '800' },
+  photoActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  photoActionBtn: { flex: 1 },
+
+  // "when" picker
+  whenSummaryRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  whenSummary: { fontSize: font.body, fontWeight: '800', color: colors.text },
+  whenNowTag: {
+    marginLeft: spacing.sm,
+    fontSize: font.tiny,
+    fontWeight: '800',
+    color: colors.primaryDark,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  stepperRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  stepper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  stepBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBtnText: { fontSize: font.body, fontWeight: '800', color: colors.primary },
+  stepLabel: { fontSize: font.tiny, fontWeight: '700', color: colors.textMuted },
 
   prototype: { borderStyle: 'dashed', borderColor: colors.glasses, backgroundColor: colors.glassesSoft },
   protoBadge: {
