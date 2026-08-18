@@ -18,7 +18,7 @@ import re
 
 from .. import config, db
 from ..embeddings import embed
-from . import usda
+from . import openfoodfacts, usda
 
 _NUTRIENTS = [
     "calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "sugar_g",
@@ -77,11 +77,15 @@ def _find_or_create_entity(norm: str, fallback: dict | None) -> tuple[dict, str]
                 if named.get("sim", 0) >= config.ENTITY_MATCH_THRESHOLD:
                     return _row_to_entity(named), "similar"
 
-            # 4. USDA lookup, else 5. fallback estimate. A USDA hit with 0 kcal
-            # is a junk match (e.g. "beef patty" -> "Bologna, Beef") — treat it
-            # as a miss and prefer the model's own per-item estimate.
+            # 4. USDA lookup, else 4b. Open Food Facts (international/branded,
+            # covers regional dishes USDA lacks), else 5. the LLM estimate. A hit
+            # with 0 kcal is junk (e.g. "beef patty" -> "Bologna, Beef") — treat
+            # it as a miss and try the next tier.
             entry = usda.search_food(norm)
             method = "usda"
+            if entry is None or float(entry.get("calories") or 0) <= 0:
+                entry = openfoodfacts.search_food(norm)
+                method = "off"
             if entry is None or float(entry.get("calories") or 0) <= 0:
                 entry = _fallback_entity(norm, fallback)
                 method = "fallback"

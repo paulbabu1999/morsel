@@ -612,7 +612,10 @@ function DraftEditor({
             Review &amp; edit items
           </div>
         </div>
-        <SourceBadge source={source} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ConfidenceChip value={draft.confidence} />
+          <SourceBadge source={source} />
+        </div>
       </div>
 
       {/* Estimated totals from analysis */}
@@ -772,6 +775,39 @@ function DraftEditor({
         </button>
       </div>
     </div>
+  );
+}
+
+/** How sure the extractor is about this draft — helps the user know when to
+ *  double-check the numbers or use the "Fix it" box. */
+function ConfidenceChip({ value }: { value: number }) {
+  const pct = Math.round((value ?? 0) * 100);
+  const [label, color] =
+    value >= 0.85
+      ? ["High", "var(--good)"]
+      : value >= 0.6
+        ? ["Medium", "#c98500"]
+        : ["Low", "var(--danger)"];
+  return (
+    <span
+      title={`Extraction confidence ${pct}%`}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 12,
+        fontWeight: 600,
+        color,
+        background: "var(--surface-2)",
+        border: "1px solid var(--border)",
+        borderRadius: 999,
+        padding: "4px 10px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: color }} />
+      {label} · {pct}%
+    </span>
   );
 }
 

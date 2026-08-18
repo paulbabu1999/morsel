@@ -50,7 +50,8 @@ export interface MealItem {
   calcium_mg: number;
   potassium_mg: number;
   confidence: number;
-  resolution_method: ResolutionMethod | null;
+  // e.g. "alias", "usda", "off", "fallback", or a "…+anchored" variant
+  resolution_method: string | null;
 }
 
 export interface Meal {
