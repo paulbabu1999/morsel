@@ -571,9 +571,11 @@ export function getQueryExamples(): Promise<string[]> {
 }
 
 export function getStats(period: StatsPeriod = 'week'): Promise<StatsResponse> {
-  return request<StatsResponse>(`/stats?period=${period}`);
+  return request<StatsResponse>(`/stats?period=${period}&tz_offset=${new Date().getTimezoneOffset()}`);
 }
 
 export function getInsights(period: StatsPeriod = 'week'): Promise<InsightsResponse> {
-  return request<InsightsResponse>(`/insights?period=${period}`);
+  return request<InsightsResponse>(
+    `/insights?period=${period}&tz_offset=${new Date().getTimezoneOffset()}`,
+  );
 }

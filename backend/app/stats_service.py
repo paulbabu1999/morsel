@@ -30,26 +30,43 @@ def _status(pct: float | None, kind: str) -> str:
     return "low" if pct < 80 else "high" if pct > 150 else "ok"
 
 
-def compute_stats(period: str = "week", user_id: str = config.DEFAULT_USER_ID) -> dict:
+def compute_stats(
+    period: str = "week",
+    user_id: str = config.DEFAULT_USER_ID,
+    tz_offset_min: int = 0,
+) -> dict:
     days = _PERIOD_DAYS.get(period, 7)
-    now = datetime.now()
-    day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start = day0 - timedelta(days=days - 1)
+    # Day boundaries are computed in the USER's local timezone, not the server's.
+    # `eaten_at` is stored in the server clock (UTC on the hosted box); `tz_offset_min`
+    # is the browser's Date.getTimezoneOffset() (minutes; UTC = local + offset, so
+    # e.g. US-Eastern = 240). We build the window in local time, shift it back to UTC
+    # to query eaten_at, and bucket/count by local calendar date. Default 0 == UTC
+    # (back-compat) — without this, an evening meal logged in a west-of-UTC zone lands
+    # on the previous UTC day and vanishes from "Today" once UTC ticks past midnight.
+    tz = timedelta(minutes=tz_offset_min)
+    now = datetime.now()                 # server clock (UTC on Render)
+    now_local = now - tz                 # user's local wall clock
+    day0_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_local = day0_local - timedelta(days=days - 1)
+    start = start_local + tz             # back to the server/UTC frame for querying
 
     meals = repo.list_meals(user_id, start=start, end=now, limit=1000)
     profile = repo.get_profile(user_id)
+
+    def _local_date(dt):
+        return (dt - tz).date()
 
     # Per-day averages divide by the number of days actually LOGGED in the window,
     # not the raw window length. Otherwise a new user's week/month averages are
     # deflated by empty days (e.g. on day 1, dividing by 7 or 30 makes "avg/day"
     # a fraction of the real intake). With this, day/week/month all read the same
     # on day 1, then diverge only as more days get logged.
-    logged_days = max(1, len({m["eaten_at"].date() for m in meals}))
+    logged_days = max(1, len({_local_date(m["eaten_at"]) for m in meals}))
 
-    # daily buckets
-    buckets: dict[str, list] = {(start + timedelta(days=i)).date().isoformat(): [] for i in range(days)}
+    # daily buckets keyed by the user's LOCAL calendar date
+    buckets: dict[str, list] = {(start_local + timedelta(days=i)).date().isoformat(): [] for i in range(days)}
     for m in meals:
-        buckets.setdefault(m["eaten_at"].date().isoformat(), []).append(m)
+        buckets.setdefault(_local_date(m["eaten_at"]).isoformat(), []).append(m)
     by_day = [
         {
             "date": d,
@@ -89,8 +106,8 @@ def compute_stats(period: str = "week", user_id: str = config.DEFAULT_USER_ID) -
     meal_type_counts = Counter(m["meal_type"] for m in meals)
     return {
         "period": period,
-        "start": start.date().isoformat(),
-        "end": now.date().isoformat(),
+        "start": start_local.date().isoformat(),
+        "end": now_local.date().isoformat(),
         "total_meals": len(meals),
         "total_calories": total_cal,
         "days_tracked": logged_days,

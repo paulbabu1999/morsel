@@ -212,13 +212,21 @@ def query_examples() -> list[str]:
 # --- stats -----------------------------------------------------------------
 
 @app.get("/stats", response_model=StatsResponse)
-def stats(period: str = Query("week", pattern="^(day|week|month)$"), user_id: str = CurrentUser) -> StatsResponse:
-    return StatsResponse(**stats_service.compute_stats(period, user_id))
+def stats(
+    period: str = Query("week", pattern="^(day|week|month)$"),
+    tz_offset: int = Query(0, ge=-840, le=840),  # browser Date.getTimezoneOffset() (minutes)
+    user_id: str = CurrentUser,
+) -> StatsResponse:
+    return StatsResponse(**stats_service.compute_stats(period, user_id, tz_offset))
 
 
 @app.get("/insights", response_model=InsightsResponse)
-def insights(period: str = Query("week", pattern="^(day|week|month)$"), user_id: str = CurrentUser) -> InsightsResponse:
-    return InsightsResponse(**insights_service.compute_insights(period, user_id))
+def insights(
+    period: str = Query("week", pattern="^(day|week|month)$"),
+    tz_offset: int = Query(0, ge=-840, le=840),
+    user_id: str = CurrentUser,
+) -> InsightsResponse:
+    return InsightsResponse(**insights_service.compute_insights(period, user_id, tz_offset))
 
 
 # --- admin -----------------------------------------------------------------

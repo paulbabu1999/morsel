@@ -51,15 +51,23 @@ def _top_contributors(nutrient_col: str, start, end, user_id: str, n: int = 2) -
     return db.run_readonly_sql(sql, user_id, {"s": start, "e": end, "n": n})
 
 
-def compute_insights(period: str = "week", user_id: str = config.DEFAULT_USER_ID) -> dict:
-    stats = stats_service.compute_stats(period, user_id)
+def compute_insights(
+    period: str = "week",
+    user_id: str = config.DEFAULT_USER_ID,
+    tz_offset_min: int = 0,
+) -> dict:
+    stats = stats_service.compute_stats(period, user_id, tz_offset_min)
     insights: list[dict] = []
 
     if not stats["total_meals"]:
         return {"period": period, "headline": "No meals logged yet in this window.", "insights": []}
 
-    start = _period_start(stats)
-    end = _period_end(stats)
+    # stats start/end are LOCAL dates; shift back to the server/UTC frame (where
+    # eaten_at lives) so the top-contributor SQL matches the same window.
+    from datetime import timedelta
+    tz = timedelta(minutes=tz_offset_min)
+    start = _period_start(stats) + tz
+    end = _period_end(stats) + tz
     targets = stats.get("targets")
     label = {"day": "today", "week": "this week", "month": "this month"}.get(period, "recently")
 

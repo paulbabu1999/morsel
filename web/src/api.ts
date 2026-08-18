@@ -450,10 +450,14 @@ export const api = {
     }),
 
   getStats: (period: "day" | "week" | "month" = "week") =>
-    request<StatsResponse>(`/stats${toQuery({ period })}`),
+    request<StatsResponse>(
+      `/stats${toQuery({ period, tz_offset: new Date().getTimezoneOffset() })}`,
+    ),
 
   getInsights: (period: "day" | "week" | "month" = "week") =>
-    request<InsightsResponse>(`/insights${toQuery({ period })}`),
+    request<InsightsResponse>(
+      `/insights${toQuery({ period, tz_offset: new Date().getTimezoneOffset() })}`,
+    ),
 
   listMeals: (filters: MealFilters = {}) =>
     request<Meal[]>(`/meals${toQuery({ ...filters })}`),
