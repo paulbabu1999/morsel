@@ -121,6 +121,7 @@ class DraftItem(BaseModel):
     quantity: float = 1
     unit: Optional[str] = None
     grams: Optional[float] = None
+    calories: Optional[float] = None  # the draft's per-item kcal, anchors the density check on save
 
 
 class CaptureDraft(BaseModel):
@@ -166,6 +167,18 @@ class MealCreate(BaseModel):
     photo_uris: Optional[list[str]] = None
     description: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
+
+
+class RefineRequest(BaseModel):
+    """Apply a plain-language correction to a draft's items (re-estimate calories)."""
+
+    items: list[DraftItem]
+    correction: str
+    meal_type: Optional[MealType] = None
+    location: Optional[str] = None
+    note: Optional[str] = None
+    source: CaptureSource = CaptureSource.phone
+    photo_uris: Optional[list[str]] = None
 
 
 # --- profile + targets -----------------------------------------------------

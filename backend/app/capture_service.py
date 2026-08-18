@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 from .foods import FOODS, LOCATIONS_BY_NAME
-from .llm.extract import extract_meal
+from .llm.extract import extract_meal, refine_meal
 from .models import NUTRIENTS
 from .nutrition import resolve
 
@@ -25,12 +25,17 @@ def _resolve_items(raw_items: list[dict], confidence: float) -> list[dict]:
         if fallback:
             fallback["grams"] = raw.get("estimated_grams") or raw.get("grams")
             fallback["unit"] = raw.get("unit")
+        # The LLM's own "as eaten" energy density anchors the lookup against
+        # raw-vs-cooked density blowups (see resolve_item).
+        raw_cal, raw_g = raw.get("calories"), (raw.get("estimated_grams") or raw.get("grams"))
+        anchor = float(raw_cal) * 100.0 / float(raw_g) if raw_cal and raw_g and float(raw_g) > 0 else None
         item = resolve.resolve_item(
             raw.get("name") or raw.get("raw_name", ""),
             quantity=raw.get("quantity") or 1,
             unit=raw.get("unit"),
             grams=raw.get("estimated_grams") or raw.get("grams"),
             fallback=fallback or None,
+            anchor_kcal_per_100g=anchor,
         )
         item["id"] = f"item-{uuid.uuid4().hex[:8]}"
         item["confidence"] = round(confidence, 2)
@@ -133,6 +138,44 @@ def analyze(
     return draft
 
 
+def refine(
+    items: list[dict],
+    correction: str,
+    meal_type: str | None = None,
+    location: str | None = None,
+    note: str | None = None,
+    source: str = "phone",
+    photo_uris: list[str] | None = None,
+) -> dict:
+    """Apply a plain-language correction to a draft's items and re-resolve nutrition.
+    Falls back to the original items unchanged if the model can't help (stub/error)."""
+    ext = refine_meal(items, correction)
+    if not ext or not ext.get("items"):
+        ext = {"items": items, "extractor": "correction (no change)"}
+    confidence = float(ext.get("confidence", 0.85))
+    resolved = _resolve_items(ext.get("items", []), confidence)
+    mtype = meal_type or ext.get("meal_type") or "snack"
+    loc = location if location is not None else ext.get("location")
+    thumbs = list(photo_uris or [])
+    draft = {
+        "items": resolved,
+        "meal_type": mtype,
+        "location": loc,
+        "note": note,
+        "source": source,
+        "photo_uri": thumbs[0] if thumbs else None,
+        "photo_uris": thumbs,
+        "photo_count": len(thumbs),
+        "description": ext.get("description") or _describe(mtype, resolved, loc, note),
+        "tags": _tags(resolved, loc),
+        "confidence": round(confidence, 2),
+        "extractor": ext.get("extractor", "correction"),
+        "extraction_note": f'Adjusted from your note: "{correction[:80]}".',
+    }
+    draft.update(_totals(resolved))
+    return draft
+
+
 def _normalize_eaten_at(eaten_at):
     """Store meal times in the server (UTC) frame as naive datetimes, matching the
     default `datetime.now()`. A custom time picked on the client is sent tz-aware
@@ -148,7 +191,8 @@ def _normalize_eaten_at(eaten_at):
 def build_meal(create: dict) -> dict:
     """Turn a confirmed MealCreate dict into a persistable meal (items re-resolved)."""
     raw_items = [
-        {"name": i.get("name"), "quantity": i.get("quantity", 1), "unit": i.get("unit"), "grams": i.get("grams")}
+        {"name": i.get("name"), "quantity": i.get("quantity", 1), "unit": i.get("unit"),
+         "grams": i.get("grams"), "calories": i.get("calories")}  # calories anchors the density check
         for i in create["items"]
     ]
     items = _resolve_items(raw_items, confidence=0.95)

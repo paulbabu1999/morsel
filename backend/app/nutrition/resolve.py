@@ -147,10 +147,25 @@ def resolve_item(
     unit: str | None = None,
     grams: float | None = None,
     fallback: dict | None = None,
+    anchor_kcal_per_100g: float | None = None,
 ) -> dict:
-    """Resolve one food to a normalized meal_item dict with ABSOLUTE nutrition."""
+    """Resolve one food to a normalized meal_item dict with ABSOLUTE nutrition.
+
+    `anchor_kcal_per_100g` is the LLM's own "as eaten" energy density (its per-item
+    kcal / grams * 100). If the matched food is far denser than that, it's almost
+    certainly the RAW form of a food eaten cooked (dry rice/lentils vs a cooked cup),
+    which otherwise triples the calories. In that case we rescale the whole per-100g
+    profile down to the estimate — cooking mainly adds water, so every nutrient
+    dilutes together and the ratios stay right."""
     norm = normalize_name(raw_name)
     entity, method = _find_or_create_entity(norm, fallback)
+
+    per100 = {n: float(entity.get(n) or 0) for n in _NUTRIENTS}
+    if (anchor_kcal_per_100g and per100["calories"] > anchor_kcal_per_100g * 1.8
+            and not method.startswith("fallback")):
+        scale = anchor_kcal_per_100g / per100["calories"]
+        per100 = {n: v * scale for n, v in per100.items()}
+        method += "+anchored"
 
     default_grams = float(entity.get("default_grams") or 100)
     portion_grams = float(grams) if grams else quantity * default_grams
@@ -166,6 +181,6 @@ def resolve_item(
         "resolution_method": method,
     }
     for n in _NUTRIENTS:
-        val = float(entity.get(n) or 0) * factor
+        val = per100[n] * factor
         item[n] = int(round(val)) if n == "calories" else round(val, 1)
     return item

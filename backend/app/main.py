@@ -40,6 +40,7 @@ from .models import (
     ProfileInput,
     QueryRequest,
     QueryResponse,
+    RefineRequest,
     SignupRequest,
     StatsResponse,
 )
@@ -152,6 +153,22 @@ def capture_analyze(
         note=note, images=images or None,
         meal_type=meal_type.value if meal_type else None,
         location=location, source=source.value,
+    )
+    return CaptureDraft(**draft)
+
+
+@app.post("/capture/refine", response_model=CaptureDraft)
+def capture_refine(body: RefineRequest, user_id: str = CurrentUser) -> CaptureDraft:
+    """Re-estimate a draft from a plain-language correction (e.g. 'the dal is cooked,
+    ~200 cal', 'only 2 rotis'). No DB write — the user still confirms via /meals."""
+    if not body.correction.strip():
+        raise HTTPException(status_code=400, detail="Empty correction")
+    draft = capture_service.refine(
+        items=[i.model_dump() for i in body.items],
+        correction=body.correction,
+        meal_type=body.meal_type.value if body.meal_type else None,
+        location=body.location, note=body.note, source=body.source.value,
+        photo_uris=body.photo_uris,
     )
     return CaptureDraft(**draft)
 

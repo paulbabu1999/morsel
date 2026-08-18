@@ -10,6 +10,7 @@ Returns the same shape so the capture flow is identical.
 
 from __future__ import annotations
 
+import json
 import random
 from datetime import datetime
 
@@ -52,7 +53,9 @@ _EXTRACT_SCHEMA = {
 _SYSTEM = (
     "You extract a structured meal record from a short note and/or one or more "
     "food photos. Identify each distinct food item, estimate its portion (quantity, "
-    "unit, and grams), and give rough per-item nutrition: calories, protein, carbs, "
+    "unit, and grams AS EATEN — the cooked/served weight, e.g. a cooked cup of rice "
+    "or dal, never the dry weight), and give rough per-item nutrition: calories "
+    "(also for the cooked/served portion), protein, carbs, "
     "fat, and ALSO sugar_g, fiber_g, sodium_mg, and satfat_g (these matter — a "
     "cookie or soda is mostly sugar, chips are high sodium; never leave them at 0 "
     "when the food obviously contains them). Infer meal_type from the food and time, "
@@ -127,6 +130,37 @@ def _extract_real(note, images: list[tuple[bytes, str]]) -> dict | None:
     )
     if not out or not out.get("items"):
         return None
+    return out
+
+
+# --- natural-language correction ------------------------------------------
+
+_REFINE_SYSTEM = (
+    "You correct an existing meal estimate using the user's plain-language feedback. "
+    "You are given the current items (with portions and calories) and a correction "
+    "like 'that's way too high', 'only 2 small rotis', 'the dal is cooked, ~200 cal', "
+    "or 'the coffee had oat milk and sugar'. Return the FULL corrected item list — "
+    "add, remove, rename, or re-portion items as the feedback implies, with realistic "
+    "per-item nutrition (calories/protein/carbs/fat plus sugar_g/fiber_g/sodium_mg/"
+    "satfat_g) and grams AS EATEN (cooked/served weight). Keep items the user didn't "
+    "mention unchanged. Trust the user over your prior estimate."
+)
+
+
+def refine_meal(items: list[dict], correction: str) -> dict | None:
+    """Re-estimate a meal from the current items + a user correction. Returns the
+    same shape as extract_meal, or None (stub / failure) to leave items unchanged."""
+    current = [
+        {"name": it.get("name") or it.get("canonical_name"), "quantity": it.get("quantity", 1),
+         "unit": it.get("unit"), "estimated_grams": it.get("grams"), "calories": it.get("calories")}
+        for it in items
+    ]
+    user_text = (f"Current meal estimate (JSON):\n{json.dumps(current)}\n\n"
+                 f'User correction: "{correction}"\n\nReturn the corrected meal.')
+    out = client.call_tool(_REFINE_SYSTEM, user_text, "record_meal", _EXTRACT_SCHEMA, max_tokens=1500)
+    if not out or not out.get("items"):
+        return None
+    out["extractor"] = f"{config.LLM_PROVIDER or config.LLM_KIND}-correction"
     return out
 
 
