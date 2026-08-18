@@ -5,7 +5,11 @@ depth: **`docs/TECHNICAL_DEEP_DIVE.md`**. Deploy specifics: **`docs/HOSTING.md`*
 API shapes: **`API_CONTRACT.md`**. This file is the operator's manual.
 
 ## What it is
-"Morsel" — a food-memory app. Capture a meal (photo + note) → structured,
+**"Bite"** (the user-facing brand; formerly "Morsel") — a food-memory app. All
+UI wordmarks/titles say "Bite". **Infra keeps the old `morsel` names on purpose**:
+GitHub repo `morsel`, Render `morsel-api-*`, Cloudflare project `morsel`, Neon,
+Expo `scheme: morsel` / `com.morsel.app`. Don't "fix" those to Bite — they're just
+identifiers. Capture a meal (photo + note) → structured,
 nutrition-resolved record → track vs a personalized calorie goal → ask history in
 natural language (a LangGraph router picks aggregate text-to-SQL / semantic
 pgvector+FTS / hybrid). Multi-user (email/password → JWT), per-user data isolated
