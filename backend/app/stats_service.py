@@ -39,6 +39,13 @@ def compute_stats(period: str = "week", user_id: str = config.DEFAULT_USER_ID) -
     meals = repo.list_meals(user_id, start=start, end=now, limit=1000)
     profile = repo.get_profile(user_id)
 
+    # Per-day averages divide by the number of days actually LOGGED in the window,
+    # not the raw window length. Otherwise a new user's week/month averages are
+    # deflated by empty days (e.g. on day 1, dividing by 7 or 30 makes "avg/day"
+    # a fraction of the real intake). With this, day/week/month all read the same
+    # on day 1, then diverge only as more days get logged.
+    logged_days = max(1, len({m["eaten_at"].date() for m in meals}))
+
     # daily buckets
     buckets: dict[str, list] = {(start + timedelta(days=i)).date().isoformat(): [] for i in range(days)}
     for m in meals:
@@ -60,10 +67,9 @@ def compute_stats(period: str = "week", user_id: str = config.DEFAULT_USER_ID) -
     eat_out = [m for m in meals if "eating-out" in (m.get("tags") or [])]
 
     # adequacy: compare per-day average intake to the daily target
-    n_days = max(1, days)
     adequacy = []
     for nutrient, label, unit, total_field, target_field, kind in _ADEQUACY:
-        per_day = round(sum(m[total_field] for m in meals) / n_days, 1)
+        per_day = round(sum(m[total_field] for m in meals) / logged_days, 1)
         target = (profile or {}).get(target_field)
         pct = round(100 * per_day / target, 0) if target else None
         adequacy.append({
@@ -87,8 +93,9 @@ def compute_stats(period: str = "week", user_id: str = config.DEFAULT_USER_ID) -
         "end": now.date().isoformat(),
         "total_meals": len(meals),
         "total_calories": total_cal,
-        "avg_calories_per_day": round(total_cal / n_days, 1),
-        "avg_protein_per_day": round(total_protein / n_days, 1),
+        "days_tracked": logged_days,
+        "avg_calories_per_day": round(total_cal / logged_days, 1),
+        "avg_protein_per_day": round(total_protein / logged_days, 1),
         "eat_out_meals": len(eat_out),
         "eat_out_rate": round(len(eat_out) / max(1, len(meals)), 2),
         "targets": profile,

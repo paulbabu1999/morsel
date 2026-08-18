@@ -31,7 +31,7 @@ const PERIOD_CAPTION: Record<StatsPeriod, string> = {
 };
 
 export function StatsScreen() {
-  const [period, setPeriod] = useState<StatsPeriod>('week');
+  const [period, setPeriod] = useState<StatsPeriod>('day');
   const { data, loading, error, reload, refresh, refreshing } = useAsync<StatsResponse>(
     () => getStats(period),
     [period],

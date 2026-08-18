@@ -107,7 +107,7 @@ function InsightsCard({
 }
 
 export function Dashboard() {
-  const [period, setPeriod] = useState<Period>("week");
+  const [period, setPeriod] = useState<Period>("day");
   // Refetch when the profile changes so a target update on the Profile page
   // reflects here (targets ride along in /stats and /insights).
   const { profile } = useProfile();
