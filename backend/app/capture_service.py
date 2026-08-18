@@ -8,7 +8,7 @@ name/quantity yield correct nutrition).
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .foods import FOODS, LOCATIONS_BY_NAME
 from .llm.extract import extract_meal
@@ -94,13 +94,13 @@ def _describe(meal_type: str, items: list[dict], location: str | None, note: str
 
 def analyze(
     note: str | None,
-    photo_bytes: bytes | None = None,
-    media_type: str = "image/jpeg",
+    images: list[tuple[bytes, str]] | None = None,
     meal_type: str | None = None,
     location: str | None = None,
     source: str = "phone",
 ) -> dict:
-    extraction = extract_meal(note, photo_bytes, media_type)
+    images = images or []
+    extraction = extract_meal(note, images)
     confidence = float(extraction.get("confidence", 0.9))
     items = _resolve_items(extraction.get("items", []), confidence)
 
@@ -108,13 +108,16 @@ def analyze(
     loc = location or extraction.get("location")
     description = extraction.get("description") or _describe(mtype, items, loc, note)
 
+    # The first photo is the meal's thumbnail (the user adds the finished dish
+    # first; any extra photos are ingredient context for the analysis only).
     draft = {
         "items": items,
         "meal_type": mtype,
         "location": loc,
         "note": note,
         "source": source,
-        "photo_uri": _thumbnail_data_url(photo_bytes) if photo_bytes else None,
+        "photo_uri": _thumbnail_data_url(images[0][0]) if images else None,
+        "photo_count": len(images),
         "description": description,
         "tags": _tags(items, loc),
         "confidence": round(confidence, 2),
@@ -126,6 +129,18 @@ def analyze(
     }
     draft.update(_totals(items))
     return draft
+
+
+def _normalize_eaten_at(eaten_at):
+    """Store meal times in the server (UTC) frame as naive datetimes, matching the
+    default `datetime.now()`. A custom time picked on the client is sent tz-aware
+    (its local pick converted to UTC); convert it to naive UTC here. Naive input is
+    trusted as-is. Absent -> now."""
+    if eaten_at is None:
+        return datetime.now().replace(microsecond=0)
+    if eaten_at.tzinfo is not None:
+        return eaten_at.astimezone(timezone.utc).replace(tzinfo=None, microsecond=0)
+    return eaten_at.replace(microsecond=0)
 
 
 def build_meal(create: dict) -> dict:
@@ -142,7 +157,7 @@ def build_meal(create: dict) -> dict:
 
     meal = {
         "id": f"meal-{uuid.uuid4().hex[:8]}",
-        "eaten_at": create.get("eaten_at") or datetime.now().replace(microsecond=0),
+        "eaten_at": _normalize_eaten_at(create.get("eaten_at")),
         "meal_type": mtype,
         "location_text": loc,
         "photo_uri": create.get("photo_uri"),

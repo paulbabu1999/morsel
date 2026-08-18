@@ -88,19 +88,26 @@ def call_tool(
     media_type: str = "image/jpeg",
     model: str | None = None,
     max_tokens: int = 1500,
+    images: list[tuple[bytes, str]] | None = None,
 ) -> dict | None:
-    """Get a structured JSON object back, or None on any failure."""
+    """Get a structured JSON object back, or None on any failure.
+
+    `images` is a list of (bytes, media_type) for multi-photo prompts (e.g. the
+    finished dish plus its ingredients). `photo_bytes`/`media_type` remain for the
+    single-image callers.
+    """
     if not config.USE_REAL_LLM:
         return None
+    imgs = list(images) if images else ([(photo_bytes, media_type)] if photo_bytes else [])
     kind, client = _get_client()
     model = model or config.LLM_MODEL
     try:
         if kind == "anthropic":
             content: list = []
-            if photo_bytes:
+            for data, mtype in imgs:
                 content.append({
                     "type": "image",
-                    "source": {"type": "base64", "media_type": media_type, "data": _b64(photo_bytes)},
+                    "source": {"type": "base64", "media_type": mtype, "data": _b64(data)},
                 })
             content.append({"type": "text", "text": user_text})
             resp = client.messages.create(
@@ -122,10 +129,10 @@ def call_tool(
         # room for models (Gemini 2.5/3 Flash) that spend "thinking" tokens
         # before emitting the JSON.
         content = [{"type": "text", "text": user_text}]
-        if photo_bytes:
+        for data, mtype in imgs:
             content.append({
                 "type": "image_url",
-                "image_url": {"url": f"data:{media_type};base64,{_b64(photo_bytes)}"},
+                "image_url": {"url": f"data:{mtype};base64,{_b64(data)}"},
             })
         resp = _retry(lambda: client.chat.completions.create(
             model=model, max_tokens=max(max_tokens, 2048),

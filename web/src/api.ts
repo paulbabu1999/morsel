@@ -392,7 +392,7 @@ export interface MealFilters {
 }
 
 export interface CaptureInput {
-  photo?: File | null;
+  photos?: File[]; // final dish + optional ingredient photos, one meal
   note?: string;
   meal_type?: MealType | "";
   location?: string;
@@ -467,7 +467,7 @@ export const api = {
   /** Step 1 of capture: analyze a photo/note into an editable draft (no DB write). */
   analyzeCapture: (input: CaptureInput) => {
     const fd = new FormData();
-    if (input.photo) fd.append("photo", input.photo);
+    (input.photos ?? []).forEach((p) => fd.append("photos", p));
     if (input.note) fd.append("note", input.note);
     if (input.meal_type) fd.append("meal_type", input.meal_type);
     if (input.location) fd.append("location", input.location);

@@ -131,6 +131,7 @@ class CaptureDraft(BaseModel):
     note: Optional[str] = None
     source: CaptureSource = CaptureSource.phone
     photo_uri: Optional[str] = None
+    photo_count: int = 0
     description: str = ""
     tags: list[str] = Field(default_factory=list)
     confidence: float = 0.9

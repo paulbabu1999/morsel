@@ -136,17 +136,20 @@ def set_profile(body: ProfileInput, user_id: str = CurrentUser) -> Profile:
 
 @app.post("/capture/analyze", response_model=CaptureDraft)
 def capture_analyze(
-    photo: Optional[UploadFile] = File(None),
+    photos: Optional[list[UploadFile]] = File(None),  # multiple: final dish + ingredients
+    photo: Optional[UploadFile] = File(None),          # legacy single-photo clients
     note: Optional[str] = Form(None),
     meal_type: Optional[MealType] = Form(None),
     location: Optional[str] = Form(None),
     source: CaptureSource = Form(CaptureSource.phone),
     user_id: str = CurrentUser,
 ) -> CaptureDraft:
-    photo_bytes = photo.file.read() if photo else None
-    media_type = photo.content_type if photo and photo.content_type else "image/jpeg"
+    files = list(photos or [])
+    if photo:
+        files.append(photo)
+    images = [(f.file.read(), f.content_type or "image/jpeg") for f in files]
     draft = capture_service.analyze(
-        note=note, photo_bytes=photo_bytes, media_type=media_type,
+        note=note, images=images or None,
         meal_type=meal_type.value if meal_type else None,
         location=location, source=source.value,
     )

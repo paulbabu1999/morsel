@@ -37,27 +37,49 @@ interface EditItem {
 let keySeq = 0;
 const nextKey = () => `row-${keySeq++}`;
 
+/** Format a Date as the local "YYYY-MM-DDTHH:mm" a datetime-local input expects. */
+function toLocalInputValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function Capture() {
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [source, setSource] = useState<CaptureSource>("phone");
   const [mealType, setMealType] = useState<MealType | "">("");
   const [location, setLocation] = useState("");
+  const [eatenAt, setEatenAt] = useState<string>(() => toLocalInputValue(new Date()));
 
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [saved, setSaved] = useState<Meal | null>(null);
-  // Two distinct pickers: the camera (capture="environment" opens the rear
-  // camera on phones) and the photo library (a plain file input).
+  // Camera (capture="environment" = rear camera on phones) vs. library (plain,
+  // multi-select) pickers; both append to the photo list.
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
 
-  function onPickPhoto(file: File | null) {
-    if (preview) URL.revokeObjectURL(preview);
-    setPhoto(file);
-    setPreview(file ? URL.createObjectURL(file) : null);
+  function addPhotos(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const added = Array.from(list);
+    setPhotos((p) => [...p, ...added]);
+    setPreviews((pv) => [...pv, ...added.map((f) => URL.createObjectURL(f))]);
+  }
+  function removePhoto(i: number) {
+    setPreviews((pv) => {
+      URL.revokeObjectURL(pv[i]);
+      return pv.filter((_, idx) => idx !== i);
+    });
+    setPhotos((p) => p.filter((_, idx) => idx !== i));
+  }
+  function clearPhotos() {
+    setPreviews((pv) => {
+      pv.forEach((u) => URL.revokeObjectURL(u));
+      return [];
+    });
+    setPhotos([]);
   }
 
   async function onAnalyze(e: FormEvent) {
@@ -68,7 +90,7 @@ export function Capture() {
     setSaved(null);
     try {
       const d = await api.analyzeCapture({
-        photo,
+        photos,
         note: note.trim() || undefined,
         meal_type: mealType || undefined,
         location: location.trim() || undefined,
@@ -83,11 +105,12 @@ export function Capture() {
   }
 
   function reset() {
-    onPickPhoto(null);
+    clearPhotos();
     setNote("");
     setMealType("");
     setLocation("");
     setSource("phone");
+    setEatenAt(toLocalInputValue(new Date()));
     setDraft(null);
     setSaved(null);
     setError(null);
@@ -104,10 +127,10 @@ export function Capture() {
       <div className="stub-note" style={{ marginBottom: 22 }}>
         <IconInfo />
         <div>
-          <b>Two-step capture.</b> Your photo + note are analyzed into an editable draft,
-          then each item is resolved to real USDA nutrition. Extraction uses vision
-          structured-outputs when an LLM provider is configured, and a keyword matcher
-          otherwise — the badge on each draft shows which ran. Edit anything before saving.
+          <b>Two-step capture.</b> Your photos + note are analyzed into an editable draft,
+          then each item is resolved to real USDA nutrition. Cooking something like overnight
+          oats? Add the finished dish <i>and</i> a few ingredient photos — it treats them as one
+          meal and sums the parts. Edit anything before saving.
         </div>
       </div>
 
@@ -117,37 +140,52 @@ export function Capture() {
           <div className="grid" style={{ gap: 18 }}>
             <div className="field">
               <span className="label">
-                Photo <span className="opt">· optional</span>
+                Photos <span className="opt">· optional · the dish + any ingredients</span>
               </span>
 
-              {/* Hidden inputs. The camera one requests the rear camera on
-                  phones; the library one is a plain image picker. */}
+              {/* Hidden inputs. The camera one requests the rear camera on phones
+                  (one shot at a time); the library one allows multi-select. Both
+                  append to the list. */}
               <input
                 ref={cameraRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
                 hidden
-                onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  addPhotos(e.target.files);
+                  e.target.value = "";
+                }}
               />
               <input
                 ref={libraryRef}
                 type="file"
                 accept="image/*"
+                multiple
                 hidden
-                onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  addPhotos(e.target.files);
+                  e.target.value = "";
+                }}
               />
 
-              {preview ? (
+              {previews.length > 0 ? (
                 <div className="photo-picked">
-                  <div className="dropzone-preview">
-                    <img src={preview} alt="Selected meal" />
-                    <div>
-                      <div style={{ fontWeight: 600, color: "var(--text)" }}>
-                        {photo?.name}
+                  <div className="photo-thumbs">
+                    {previews.map((src, i) => (
+                      <div className="photo-thumb" key={src}>
+                        <img src={src} alt={`Meal photo ${i + 1}`} />
+                        <button
+                          type="button"
+                          className="photo-thumb-x"
+                          onClick={() => removePhoto(i)}
+                          aria-label={`Remove photo ${i + 1}`}
+                          title="Remove"
+                        >
+                          <IconTrash width={14} height={14} />
+                        </button>
                       </div>
-                      <div className="card-hint">Retake or choose another below</div>
-                    </div>
+                    ))}
                   </div>
                   <div className="photo-actions">
                     <button
@@ -156,7 +194,7 @@ export function Capture() {
                       onClick={() => cameraRef.current?.click()}
                     >
                       <IconCamera width={16} height={16} />
-                      Retake
+                      Take photo
                     </button>
                     <button
                       type="button"
@@ -164,15 +202,11 @@ export function Capture() {
                       onClick={() => libraryRef.current?.click()}
                     >
                       <IconImage width={16} height={16} />
-                      Choose another
+                      Add from library
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => onPickPhoto(null)}
-                    >
+                    <button type="button" className="btn btn-ghost" onClick={clearPhotos}>
                       <IconTrash width={16} height={16} />
-                      Remove
+                      Clear
                     </button>
                   </div>
                 </div>
@@ -262,6 +296,20 @@ export function Capture() {
               />
             </div>
 
+            <div className="field">
+              <label className="label" htmlFor="eatenAt">
+                When <span className="opt">· defaults to now — set it for an earlier meal</span>
+              </label>
+              <input
+                id="eatenAt"
+                className="input"
+                type="datetime-local"
+                value={eatenAt}
+                max={toLocalInputValue(new Date())}
+                onChange={(e) => setEatenAt(e.target.value)}
+              />
+            </div>
+
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-primary" type="submit" disabled={analyzing}>
                 <IconSpark />
@@ -289,6 +337,7 @@ export function Capture() {
             <DraftEditor
               draft={draft}
               source={source}
+              eatenAt={eatenAt}
               onSaved={setSaved}
             />
           )}
@@ -319,10 +368,12 @@ export function Capture() {
 function DraftEditor({
   draft,
   source,
+  eatenAt,
   onSaved,
 }: {
   draft: CaptureDraft;
   source: CaptureSource;
+  eatenAt: string;
   onSaved: (m: Meal) => void;
 }) {
   const [items, setItems] = useState<EditItem[]>(() =>
@@ -370,6 +421,9 @@ function DraftEditor({
       note: draft.note ?? null,
       source,
       photo_uri: draft.photo_uri,
+      // datetime-local is local wall-clock; send UTC so the server stores it in
+      // the same frame as server-generated times (see _normalize_eaten_at).
+      eaten_at: eatenAt ? new Date(eatenAt).toISOString() : null,
       description: null, // re-derived server-side from the edited items
       tags: [],
     };

@@ -46,12 +46,27 @@ _EXTRACT_SCHEMA = {
 }
 
 _SYSTEM = (
-    "You extract a structured meal record from a food photo and/or a short note. "
-    "Identify each distinct food item, estimate its portion (quantity, unit, and "
-    "grams), and give rough per-item calories and macros (protein/carbs/fat). "
-    "Infer meal_type from the food and time, and location if mentioned. Write a "
-    "one-line description. Set confidence in [0,1]. Emit best estimates; the app "
-    "looks up authoritative nutrition afterward."
+    "You extract a structured meal record from a short note and/or one or more "
+    "food photos. Identify each distinct food item, estimate its portion (quantity, "
+    "unit, and grams), and give rough per-item calories and macros "
+    "(protein/carbs/fat). Infer meal_type from the food and time, and location if "
+    "mentioned. Write a one-line description. Set confidence in [0,1]. Emit best "
+    "estimates; the app looks up authoritative nutrition afterward.\n"
+    "\n"
+    "MULTIPLE PHOTOS = ONE MEAL. You may be given several photos of the SAME meal: "
+    "the finished dish plus close-ups of ingredients that went into it (e.g. "
+    "overnight oats shown as the final jar, plus the oats, milk, and berries added). "
+    "Treat all photos together as a single meal. Use the ingredient photos to "
+    "identify components and estimate portions you can't judge from the final dish, "
+    "but DO NOT double-count: if something appears both on its own and mixed into the "
+    "final dish, count it exactly once. Break a composed dish into its ingredient "
+    "items (rolled oats, milk, honey, granola, berries…) rather than one vague "
+    "'overnight oats' line, and sum the components.\n"
+    "\n"
+    "Name each item specifically and generically enough to match a nutrition "
+    "database (USDA FoodData Central): prefer 'rolled oats', 'plain whole milk "
+    "yogurt', 'blueberries', 'almond milk' over brand names or vague labels, so the "
+    "lookup resolves to the right food."
 )
 
 _KEYWORD_HINTS = {
@@ -69,11 +84,20 @@ _KEYWORD_HINTS = {
 
 def extract_meal(
     note: str | None,
+    images: list[tuple[bytes, str]] | None = None,
+    *,
     photo_bytes: bytes | None = None,
     media_type: str = "image/jpeg",
 ) -> dict:
-    """Return {items, meal_type, location, description, confidence, extractor}."""
-    real = _extract_real(note, photo_bytes, media_type)
+    """Return {items, meal_type, location, description, confidence, extractor}.
+
+    `images` is a list of (bytes, media_type) for a multi-photo meal (final dish +
+    ingredients). `photo_bytes`/`media_type` are the legacy single-image path.
+    """
+    if images is None and photo_bytes is not None:
+        images = [(photo_bytes, media_type)]
+    images = images or []
+    real = _extract_real(note, images)
     if real is not None:
         real["extractor"] = f"{config.LLM_PROVIDER or config.LLM_KIND}-vision (structured outputs)"
         return real
@@ -82,11 +106,18 @@ def extract_meal(
     return result
 
 
-def _extract_real(note, photo_bytes, media_type) -> dict | None:
-    user_text = f"Note: {note}" if note else "No note provided; use the photo."
+def _extract_real(note, images: list[tuple[bytes, str]]) -> dict | None:
+    if note and len(images) > 1:
+        user_text = f"Note: {note}\n({len(images)} photos of the same meal follow.)"
+    elif note:
+        user_text = f"Note: {note}"
+    elif len(images) > 1:
+        user_text = f"No note provided; {len(images)} photos of the same meal follow."
+    else:
+        user_text = "No note provided; use the photo."
     out = client.call_tool(
         _SYSTEM, user_text, "record_meal", _EXTRACT_SCHEMA,
-        photo_bytes=photo_bytes, media_type=media_type, max_tokens=1500,
+        images=images, max_tokens=1500,
     )
     if not out or not out.get("items"):
         return None

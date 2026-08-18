@@ -584,6 +584,44 @@ button {
   border-radius: 10px;
 }
 
+/* Multi-photo thumbnail grid (final dish + ingredients) */
+.photo-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+}
+.photo-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.photo-thumb-x {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(59, 53, 46, 0.62);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+.photo-thumb-x:hover {
+  background: rgba(59, 53, 46, 0.82);
+}
+
 /* Photo capture picker (Take photo / Choose from library) */
 .photo-actions {
   display: flex;
