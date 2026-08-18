@@ -258,6 +258,7 @@ class StatsResponse(BaseModel):
     end: str
     total_meals: int
     total_calories: int
+    days_tracked: int = 1  # distinct days with entries in the window (the avg divisor)
     avg_calories_per_day: float
     avg_protein_per_day: float
     eat_out_meals: int
