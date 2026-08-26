@@ -146,6 +146,17 @@ Local: `POST /admin/reset` (authed — resets the current user to seeded sample 
 | Wrong/zero nutrition on a food | `app/nutrition/{usda,resolve}.py` (energy ids, 0-kcal cache gate) |
 | Query routed wrong / bad answer | `app/llm/classify.py`, `app/graph/nodes.py`, `app/llm/synthesize.py` |
 | SQL error / injection worry | `app/sql_guard.py`, `app/llm/sql.py` |
+| Calories way off (raw vs cooked) | `app/nutrition/resolve.py` (`anchor_kcal_per_100g` rescale), `app/llm/extract.py` prompt |
+| Multi-meal / NL quick-log | `POST /capture/quicklog` + `/meals/batch`; `app/llm/extract.py:extract_meals_multi` |
+| NL correction ("Fix it") | `POST /capture/refine`; `app/llm/extract.py:refine_meal` |
+| Feed empty / wrong / leaking | `app/social.py` (NO RLS on social tables — visibility is in the queries) |
 | Dashboard stale after edit | `web/src/pages/Dashboard.tsx` (profile.updated_at dep) |
 | Hosted embeddings failing | `app/embeddings.py` (`_embed_gemini`), Render `EMBED_*` env |
 | Deploy issues | `docs/HOSTING.md`, Render/Cloudflare dashboards, `backend/.env.hosting` |
+
+**Social layer (`app/social.py`)**: tables `follows`, `groups`, `group_members`,
+`shared_meals` + `users.display_name`. These are cross-user, so **no RLS** — access
+is enforced in the queries (feed = shares from people you follow + your groups + your
+own). Sharing writes a **denormalized snapshot** into `shared_meals`; it never exposes
+the RLS-protected `meals`. The feed **omits calories on purpose** (supportive
+accountability, not a scoreboard). `morsel_app` must be granted on these tables.
