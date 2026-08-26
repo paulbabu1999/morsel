@@ -11,12 +11,13 @@ import type {
 } from "../api";
 import { formatNumber, titleCase } from "../lib/format";
 import { PageHead } from "../components/ui";
-import { ErrorState } from "../components/states";
+import { ErrorState, Loading } from "../components/states";
 import { SourceBadge } from "../components/badges";
 import { PhotoGallery } from "../components/PhotoGallery";
 import {
   IconCamera,
   IconCheck,
+  IconClock,
   IconImage,
   IconInfo,
   IconPlus,
@@ -123,10 +124,39 @@ export function Capture() {
   const [draft, setDraft] = useState<CaptureDraft | null>(() => persisted?.draft ?? null);
   const [saved, setSaved] = useState<Meal | null>(null);
 
+  // Quick log (free-text, multi-meal) — an additional path alongside the
+  // photo/analyze flow. Its parsed drafts take over the right review column.
+  const [quickText, setQuickText] = useState("");
+  const [quickLogging, setQuickLogging] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickDrafts, setQuickDrafts] = useState<CaptureDraft[] | null>(null);
+
+  // "Log again" chips: recent meals (time-of-day biased) to re-log in one tap.
+  const [suggestions, setSuggestions] = useState<Meal[]>([]);
+  // Per-suggestion re-log state, keyed by meal id ("saving" → "done").
+  const [relogState, setRelogState] = useState<Record<string, "saving" | "done">>({});
+
   // Warm the (Render free-tier) backend the moment the user lands on Capture,
   // so a cold box is already spinning up before they hit Analyze.
   useEffect(() => {
     warmup();
+  }, []);
+
+  // Best-effort: pull recent meals to offer as one-tap "Log again" chips.
+  // Failures (or an empty list) simply render nothing.
+  useEffect(() => {
+    let alive = true;
+    api
+      .getSuggestions()
+      .then((s) => {
+        if (alive) setSuggestions(s);
+      })
+      .catch(() => {
+        /* best-effort — no chips is fine */
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Persist the in-progress draft + form state whenever it changes, so it
@@ -210,6 +240,72 @@ export function Capture() {
     clearPersistedCapture();
   }
 
+  /** Parse a free-text quick log into one or more review drafts. */
+  async function runQuickLog(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || quickLogging) return;
+    setQuickLogging(true);
+    setQuickError(null);
+    setQuickDrafts(null);
+    try {
+      const drafts = await api.quickLog(trimmed, source);
+      if (drafts.length === 0) {
+        setQuickError(
+          "Couldn't find any meals in that — try adding a little more detail.",
+        );
+        return;
+      }
+      setQuickDrafts(drafts);
+    } catch (err) {
+      setQuickError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setQuickLogging(false);
+    }
+  }
+
+  function onQuickLog(e: FormEvent) {
+    e.preventDefault();
+    runQuickLog(quickText);
+  }
+
+  /** "Log more" — drop the parsed drafts and clear the box for a fresh entry. */
+  function resetQuickLog() {
+    setQuickText("");
+    setQuickDrafts(null);
+    setQuickError(null);
+  }
+
+  /** Re-log a copy of a past meal from a "Log again" chip (best-effort). */
+  async function relogSuggestion(m: Meal) {
+    if (relogState[m.id]) return; // in flight or already logged
+    setRelogState((s) => ({ ...s, [m.id]: "saving" }));
+    try {
+      await api.createMeal({
+        meal_type: m.meal_type,
+        items: m.items.map((i) => ({
+          name: i.canonical_name,
+          quantity: i.quantity,
+          unit: i.unit,
+          grams: i.grams,
+          calories: i.calories,
+        })),
+        location: m.location_text,
+        source: "phone",
+        photo_uris: m.photo_uris,
+        description: null,
+        tags: [],
+      });
+      setRelogState((s) => ({ ...s, [m.id]: "done" }));
+    } catch {
+      // Best-effort: clear the in-flight flag so the chip stays tappable.
+      setRelogState((s) => {
+        const next = { ...s };
+        delete next[m.id];
+        return next;
+      });
+    }
+  }
+
   return (
     <>
       <PageHead
@@ -217,6 +313,44 @@ export function Capture() {
         title="Capture a meal"
         subtitle="Snap a photo and describe what you ate. Bite analyzes it into an editable draft — tweak the items, then confirm to save with full nutrition."
       />
+
+      {suggestions.length > 0 && (
+        <div className="logagain">
+          <div className="logagain-label">
+            <IconClock width={13} height={13} />
+            Log again
+          </div>
+          <div className="logagain-chips">
+            {suggestions.map((m) => {
+              const state = relogState[m.id];
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="logagain-chip"
+                  onClick={() => relogSuggestion(m)}
+                  disabled={state === "saving" || state === "done"}
+                  title={`Log again: ${m.description}`}
+                >
+                  <span className="logagain-chip-name">{m.description}</span>
+                  {state === "done" ? (
+                    <span className="logagain-chip-done">
+                      <IconCheck width={13} height={13} />
+                      Logged
+                    </span>
+                  ) : (
+                    <span className="logagain-chip-cal">
+                      {state === "saving"
+                        ? "Logging…"
+                        : `${formatNumber(m.total_calories)} kcal`}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="stub-note" style={{ marginBottom: 22 }}>
         <IconInfo />
@@ -229,8 +363,41 @@ export function Capture() {
       </div>
 
       <div className="grid two-col">
-        {/* Step 1 — capture form */}
-        <form className="card card-pad" onSubmit={onAnalyze}>
+        {/* Left column — quick log (free text) above the photo/analyze form */}
+        <div className="grid" style={{ gap: 18, alignContent: "start" }}>
+          {/* Quick log — type several meals at once */}
+          <form className="card card-pad" onSubmit={onQuickLog}>
+            <div className="field">
+              <label className="label" htmlFor="quicklog">
+                Quick log{" "}
+                <span className="opt">· type everything you ate in one go</span>
+              </label>
+              <textarea
+                id="quicklog"
+                className="textarea"
+                value={quickText}
+                onChange={(e) => setQuickText(e.target.value)}
+                onFocus={() => warmup()}
+                placeholder="Type everything you ate — 'oatmeal and coffee for breakfast, a chicken burrito at Chipotle for lunch, an apple'"
+              />
+            </div>
+            <div className="card-hint" style={{ margin: "10px 0 0" }}>
+              We'll split it into separate meals you can review before saving.
+            </div>
+            <div style={{ display: "flex", marginTop: 14 }}>
+              <button
+                className="btn btn-primary"
+                type="submit"
+                disabled={quickLogging || !quickText.trim()}
+              >
+                <IconSpark />
+                {quickLogging ? "Reading…" : "Quick log"}
+              </button>
+            </div>
+          </form>
+
+          {/* Step 1 — photo/analyze capture form (single meal) */}
+          <form className="card card-pad" onSubmit={onAnalyze}>
           <div className="grid" style={{ gap: 18 }}>
             <div className="field">
               <span className="label">
@@ -420,42 +587,234 @@ export function Capture() {
             </div>
           </div>
         </form>
+        </div>
 
-        {/* Step 2 — editable draft / saved result */}
+        {/* Step 2 — quick-log review takes over the column, else the photo draft */}
         <div>
-          {error && <ErrorState message={error} />}
-          {!error && saved && (
-            <SavedMeal meal={saved} onLogAnother={reset} />
-          )}
-          {!error && !saved && draft && (
-            <DraftEditor
-              draft={draft}
-              source={source}
-              eatenAt={eatenAt}
-              onSaved={setSaved}
-              onRefined={setDraft}
-            />
-          )}
-          {!error && !saved && !draft && (
-            <div className="card card-pad" style={{ height: "100%" }}>
-              <div
-                className="state"
-                style={{ padding: "40px 12px", height: "100%", justifyContent: "center" }}
-              >
-                <div className="state-icon">
-                  <IconSpark />
-                </div>
-                <div className="state-title">Your editable draft appears here</div>
-                <div className="state-msg">
-                  Add a note (and optionally a photo), then hit “Analyze”. You'll get a
-                  resolved item list you can edit before saving.
-                </div>
-              </div>
+          {quickLogging ? (
+            <div
+              className="card card-pad"
+              style={{ height: "100%", display: "grid", placeItems: "center" }}
+            >
+              <Loading label="Reading your quick log…" />
             </div>
+          ) : quickError ? (
+            <ErrorState message={quickError} onRetry={() => runQuickLog(quickText)} />
+          ) : quickDrafts ? (
+            <QuickLogReview
+              initialDrafts={quickDrafts}
+              source={source}
+              onReset={resetQuickLog}
+            />
+          ) : (
+            <>
+              {error && <ErrorState message={error} />}
+              {!error && saved && <SavedMeal meal={saved} onLogAnother={reset} />}
+              {!error && !saved && draft && (
+                <DraftEditor
+                  draft={draft}
+                  source={source}
+                  eatenAt={eatenAt}
+                  onSaved={setSaved}
+                  onRefined={setDraft}
+                />
+              )}
+              {!error && !saved && !draft && (
+                <div className="card card-pad" style={{ height: "100%" }}>
+                  <div
+                    className="state"
+                    style={{ padding: "40px 12px", height: "100%", justifyContent: "center" }}
+                  >
+                    <div className="state-icon">
+                      <IconSpark />
+                    </div>
+                    <div className="state-title">Your editable draft appears here</div>
+                    <div className="state-msg">
+                      Add a note (and optionally a photo), then hit “Analyze”. You'll get a
+                      resolved item list you can edit before saving.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+/* ---------------- Quick-log review (multi-meal) ---------------- */
+function QuickLogReview({
+  initialDrafts,
+  source,
+  onReset,
+}: {
+  initialDrafts: CaptureDraft[];
+  source: CaptureSource;
+  /** "Log more" — clear the parsed drafts and the quick-log box in the parent. */
+  onReset: () => void;
+}) {
+  // A local, removable working copy of the parsed drafts.
+  const [drafts, setDrafts] = useState<CaptureDraft[]>(initialDrafts);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+
+  function removeDraft(idx: number) {
+    setDrafts((ds) => ds.filter((_, i) => i !== idx));
+  }
+
+  async function saveAll() {
+    if (saving || drafts.length === 0) return;
+    const bodies: MealCreate[] = drafts.map((d) => ({
+      meal_type: d.meal_type,
+      items: d.items.map((i) => ({
+        name: i.canonical_name,
+        quantity: i.quantity,
+        unit: i.unit,
+        grams: i.grams,
+        calories: i.calories,
+      })),
+      location: d.location,
+      source,
+      photo_uris: d.photo_uris,
+      description: null,
+      tags: [],
+    }));
+    setSaving(true);
+    setErr(null);
+    try {
+      const meals = await api.createMealsBatch(bodies);
+      setSavedCount(meals.length);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Success — a brief confirmation with a path back to a fresh quick log.
+  if (savedCount !== null) {
+    return (
+      <div className="card card-pad" style={{ height: "100%" }}>
+        <div
+          className="state"
+          style={{ padding: "40px 12px", height: "100%", justifyContent: "center" }}
+        >
+          <div className="state-icon" style={{ color: "var(--good)" }}>
+            <IconCheck />
+          </div>
+          <div className="state-title">
+            Saved {savedCount} meal{savedCount === 1 ? "" : "s"}
+          </div>
+          <div className="state-msg">They're in your history with full nutrition.</div>
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <Link className="btn btn-ghost" to="/history">
+              See history
+            </Link>
+            <button className="btn btn-primary" onClick={onReset}>
+              Log more
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card card-pad">
+      <div className="card-head">
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 4 }}>
+            Quick log · not saved yet
+          </div>
+          <div className="card-title" style={{ fontSize: 17 }}>
+            {drafts.length} meal{drafts.length === 1 ? "" : "s"} to review
+          </div>
+        </div>
+        <SourceBadge source={source} />
+      </div>
+
+      <div className="card-hint" style={{ marginBottom: 14 }}>
+        Parsed from your text. Remove anything that's off, then save them together —
+        nutrition is resolved per item on save.
+      </div>
+
+      {drafts.length === 0 ? (
+        <div className="stub-note">
+          <IconInfo />
+          <div>All meals removed. Hit “Log more” to start over.</div>
+        </div>
+      ) : (
+        <div className="quicklog-list">
+          {drafts.map((d, idx) => (
+            <div className="quicklog-card" key={idx}>
+              <div className="quicklog-card-head">
+                <div className="quicklog-card-titles">
+                  <span className="meal-type-tag">{titleCase(d.meal_type)}</span>
+                  <div className="quicklog-desc">{d.description}</div>
+                </div>
+                <div className="quicklog-cal">
+                  {formatNumber(d.total_calories)} <span>kcal</span>
+                </div>
+                <button
+                  type="button"
+                  className="quicklog-x"
+                  onClick={() => removeDraft(idx)}
+                  aria-label={`Remove ${d.description}`}
+                  title="Remove meal"
+                >
+                  ×
+                </button>
+              </div>
+              <ul className="quicklog-items">
+                {d.items.map((it, itemIdx) => (
+                  <li key={itemIdx}>
+                    <span className="quicklog-item-name">{it.canonical_name}</span>
+                    <span className="quicklog-item-meta">
+                      {formatNumber(it.quantity, 2)} {it.unit ?? ""} ·{" "}
+                      {formatNumber(it.calories)} kcal
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {err && (
+        <div
+          className="stub-note"
+          style={{
+            marginTop: 12,
+            background: "rgba(230,103,103,0.12)",
+            borderColor: "rgba(230,103,103,0.3)",
+            color: "#ffd0d0",
+          }}
+        >
+          <IconInfo />
+          <div>{err}</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+        <button
+          className="btn btn-primary"
+          onClick={saveAll}
+          disabled={saving || drafts.length === 0}
+        >
+          <IconCheck />
+          {saving
+            ? "Saving…"
+            : `Save all ${drafts.length} meal${drafts.length === 1 ? "" : "s"}`}
+        </button>
+        <button className="btn btn-ghost" onClick={onReset} disabled={saving}>
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 

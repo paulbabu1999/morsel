@@ -535,6 +535,12 @@ export const api = {
 
   getMeal: (id: string) => request<Meal>(`/meals/${encodeURIComponent(id)}`),
 
+  /** Recent meals to re-log, biased toward the current time of day. */
+  getSuggestions: () =>
+    request<Meal[]>(
+      `/meals/suggestions${toQuery({ tz_offset: new Date().getTimezoneOffset() })}`,
+    ),
+
   /** Step 1 of capture: analyze a photo/note into an editable draft (no DB write). */
   analyzeCapture: (input: CaptureInput) => {
     const fd = new FormData();
@@ -546,12 +552,31 @@ export const api = {
     return request<CaptureDraft>("/capture/analyze", { method: "POST", body: fd });
   },
 
+  /**
+   * Free-text quick log: parse a single sentence (e.g. "oatmeal for breakfast,
+   * a burrito for lunch") into one or more editable drafts. No DB write.
+   */
+  quickLog: (text: string, source: CaptureSource = "phone") =>
+    request<CaptureDraft[]>("/capture/quicklog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, source }),
+    }),
+
   /** Step 2 of capture: persist a confirmed/edited draft. */
   createMeal: (body: MealCreate) =>
     request<Meal>("/meals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    }),
+
+  /** Persist several confirmed drafts at once (used by multi-meal quick log). */
+  createMealsBatch: (bodies: MealCreate[]) =>
+    request<Meal[]>("/meals/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodies),
     }),
 
   /**

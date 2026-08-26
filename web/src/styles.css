@@ -1934,3 +1934,153 @@ button {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---------- "Log again" suggestion chips ---------- */
+.logagain {
+  margin-bottom: 22px;
+}
+.logagain-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.logagain-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.logagain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, opacity 0.15s;
+}
+.logagain-chip:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--text);
+  background: var(--brand-soft);
+}
+.logagain-chip:disabled {
+  cursor: default;
+}
+.logagain-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logagain-chip-cal {
+  flex: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.logagain-chip-done {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--good);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---------- Quick log — multi-meal review list ---------- */
+.quicklog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.quicklog-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  padding: 14px 16px;
+}
+.quicklog-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.quicklog-card-titles {
+  flex: 1;
+  min-width: 0;
+}
+.quicklog-desc {
+  margin-top: 3px;
+  font-weight: 600;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.quicklog-cal {
+  flex: none;
+  font-weight: 700;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.quicklog-cal span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.quicklog-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.quicklog-x:hover {
+  color: var(--danger);
+  border-color: rgba(222, 138, 123, 0.4);
+  background: rgba(222, 138, 123, 0.08);
+}
+.quicklog-items {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.quicklog-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.quicklog-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quicklog-item-meta {
+  flex: none;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

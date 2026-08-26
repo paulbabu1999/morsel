@@ -7,6 +7,25 @@ import { IconInfo } from "../components/icons";
 
 type Mode = "login" | "signup";
 
+/** Remember the last email used so the field prefills on the next visit. */
+const LAST_EMAIL_KEY = "bite_last_email";
+
+function loadLastEmail(): string {
+  try {
+    return localStorage.getItem(LAST_EMAIL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function saveLastEmail(email: string): void {
+  try {
+    localStorage.setItem(LAST_EMAIL_KEY, email);
+  } catch {
+    /* storage disabled — just don't remember it */
+  }
+}
+
 /** Turn a raw API/network error into a friendly, field-agnostic message. */
 function friendlyError(err: unknown, isSignup: boolean): string {
   if (err instanceof ApiError) {
@@ -33,7 +52,7 @@ export function Login() {
   const [mode, setMode] = useState<Mode>(
     location.pathname === "/signup" ? "signup" : "login",
   );
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(loadLastEmail);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +75,8 @@ export function Login() {
     try {
       if (isSignup) await signUp(mail, password);
       else await signIn(mail, password);
+      // Remember the email for next time now that it's known-good.
+      saveLastEmail(mail);
       navigate("/", { replace: true });
     } catch (err) {
       setError(friendlyError(err, isSignup));
@@ -103,6 +124,7 @@ export function Login() {
             </label>
             <input
               id="email"
+              name="email"
               className="input"
               type="email"
               autoComplete="email"
@@ -120,6 +142,7 @@ export function Login() {
             </label>
             <input
               id="password"
+              name="password"
               className="input"
               type="password"
               autoComplete={isSignup ? "new-password" : "current-password"}
