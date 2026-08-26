@@ -183,3 +183,50 @@ CREATE POLICY meal_items_isolation ON meal_items
     USING (user_id = current_setting('app.current_user_id', true));
 CREATE POLICY user_profile_isolation ON user_profile
     USING (user_id = current_setting('app.current_user_id', true));
+
+-- ---------------------------------------------------------------------------
+-- Social layer (follows, groups, shared meals). Cross-user by nature, so NO
+-- row-level security — visibility is enforced in app/social.py queries. Sharing
+-- writes a denormalized snapshot into shared_meals; it never exposes `meals`.
+-- ---------------------------------------------------------------------------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
+
+CREATE TABLE IF NOT EXISTS follows (
+    follower_id TEXT NOT NULL,
+    followee_id TEXT NOT NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT now(),
+    PRIMARY KEY (follower_id, followee_id)
+);
+CREATE INDEX IF NOT EXISTS follows_followee_idx ON follows (followee_id);
+
+CREATE TABLE IF NOT EXISTS groups (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    owner_id    TEXT NOT NULL,
+    invite_code TEXT NOT NULL UNIQUE,
+    created_at  TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+    group_id  TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id   TEXT NOT NULL,
+    joined_at TIMESTAMP NOT NULL DEFAULT now(),
+    PRIMARY KEY (group_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS group_members_user_idx ON group_members (user_id);
+
+CREATE TABLE IF NOT EXISTS shared_meals (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    meal_id        TEXT,
+    group_id       TEXT REFERENCES groups(id) ON DELETE CASCADE,
+    meal_type      TEXT,
+    description    TEXT NOT NULL DEFAULT '',
+    note           TEXT,
+    photo_uri      TEXT,
+    total_calories INTEGER,
+    eaten_at       TIMESTAMP,
+    shared_at      TIMESTAMP NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shared_meals_user_idx ON shared_meals (user_id, shared_at DESC);
+CREATE INDEX IF NOT EXISTS shared_meals_group_idx ON shared_meals (group_id, shared_at DESC);

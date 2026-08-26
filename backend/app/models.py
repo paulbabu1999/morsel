@@ -59,6 +59,7 @@ class AuthResponse(BaseModel):
 class MeResponse(BaseModel):
     user_id: str
     email: str
+    display_name: Optional[str] = None
 
 
 class MealItem(BaseModel):
@@ -174,6 +175,25 @@ class QuickLogRequest(BaseModel):
 
     text: str
     source: CaptureSource = CaptureSource.phone
+
+
+# --- social ---------------------------------------------------------------
+
+class DisplayNameRequest(BaseModel):
+    display_name: str
+
+
+class GroupCreateRequest(BaseModel):
+    name: str
+
+
+class GroupJoinRequest(BaseModel):
+    invite_code: str
+
+
+class ShareRequest(BaseModel):
+    group_id: Optional[str] = None  # None = share to your followers
+    note: Optional[str] = None
 
 
 class RefineRequest(BaseModel):

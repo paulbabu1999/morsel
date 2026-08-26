@@ -176,7 +176,7 @@ def get_user_by_email(email: str) -> dict | None:
 def get_user(user_id: str) -> dict | None:
     with db.app_pool().connection() as conn:
         with conn.cursor(row_factory=_dict_row()) as cur:
-            cur.execute("SELECT id, email, created_at FROM users WHERE id = %s", (user_id,))
+            cur.execute("SELECT id, email, created_at, display_name FROM users WHERE id = %s", (user_id,))
             return cur.fetchone()
 
 

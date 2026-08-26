@@ -23,13 +23,16 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import auth, capture_service, config, db, insights_service, repo, seed, stats_service
+from . import auth, capture_service, config, db, insights_service, repo, seed, social, stats_service
 from .graph import run_query
 from .llm.targets import recommend_targets
 from .models import (
     AuthResponse,
     CaptureDraft,
     CaptureSource,
+    DisplayNameRequest,
+    GroupCreateRequest,
+    GroupJoinRequest,
     InsightsResponse,
     LoginRequest,
     Meal,
@@ -42,6 +45,7 @@ from .models import (
     QueryResponse,
     QuickLogRequest,
     RefineRequest,
+    ShareRequest,
     SignupRequest,
     StatsResponse,
 )
@@ -116,7 +120,88 @@ def me(user_id: str = CurrentUser) -> MeResponse:
     u = repo.get_user(user_id)
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
-    return MeResponse(user_id=u["id"], email=u["email"])
+    return MeResponse(user_id=u["id"], email=u["email"], display_name=u.get("display_name"))
+
+
+# --- social ----------------------------------------------------------------
+
+@app.patch("/me", response_model=MeResponse)
+def set_my_name(body: DisplayNameRequest, user_id: str = CurrentUser) -> MeResponse:
+    social.set_display_name(user_id, body.display_name)
+    u = repo.get_user(user_id)
+    return MeResponse(user_id=u["id"], email=u["email"], display_name=u.get("display_name"))
+
+
+@app.get("/users/search")
+def users_search(q: str = Query("", max_length=60), user_id: str = CurrentUser) -> list[dict]:
+    return social.search_users(user_id, q)
+
+
+@app.post("/follow/{target_id}")
+def follow_user(target_id: str, user_id: str = CurrentUser) -> dict:
+    social.follow(user_id, target_id)
+    return {"ok": True}
+
+
+@app.delete("/follow/{target_id}")
+def unfollow_user(target_id: str, user_id: str = CurrentUser) -> dict:
+    social.unfollow(user_id, target_id)
+    return {"ok": True}
+
+
+@app.get("/connections")
+def my_connections(user_id: str = CurrentUser) -> dict:
+    return social.connections(user_id)
+
+
+@app.post("/groups")
+def create_group(body: GroupCreateRequest, user_id: str = CurrentUser) -> dict:
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Group needs a name")
+    return social.create_group(user_id, body.name)
+
+
+@app.post("/groups/join")
+def join_group(body: GroupJoinRequest, user_id: str = CurrentUser) -> dict:
+    g = social.join_group(user_id, body.invite_code)
+    if not g:
+        raise HTTPException(status_code=404, detail="No group with that invite code")
+    return g
+
+
+@app.get("/groups")
+def list_groups(user_id: str = CurrentUser) -> list[dict]:
+    return social.my_groups(user_id)
+
+
+@app.get("/groups/{group_id}/feed")
+def group_feed(group_id: str, user_id: str = CurrentUser) -> list[dict]:
+    items = social.group_feed(user_id, group_id)
+    if items is None:
+        raise HTTPException(status_code=403, detail="Not a member of this group")
+    return items
+
+
+@app.post("/meals/{meal_id}/share")
+def share_meal(meal_id: str, body: ShareRequest, user_id: str = CurrentUser) -> dict:
+    meal = repo.get_meal(meal_id, user_id)  # RLS-scoped: confirms the user owns it
+    if not meal:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    sid = social.share_meal(user_id, meal, group_id=body.group_id, note=body.note)
+    if sid is None:
+        raise HTTPException(status_code=403, detail="Not a member of that group")
+    return {"shared_id": sid}
+
+
+@app.delete("/shared/{shared_id}")
+def unshare(shared_id: str, user_id: str = CurrentUser) -> dict:
+    social.unshare(user_id, shared_id)
+    return {"ok": True}
+
+
+@app.get("/feed")
+def get_feed(user_id: str = CurrentUser) -> list[dict]:
+    return social.feed(user_id)
 
 
 # --- profile ---------------------------------------------------------------
