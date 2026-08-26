@@ -170,6 +170,37 @@ def refine_meal(items: list[dict], correction: str) -> dict | None:
     return out
 
 
+# --- multi-meal quick log --------------------------------------------------
+
+_MEALS_SCHEMA = {
+    "type": "object",
+    "properties": {"meals": {"type": "array", "items": _EXTRACT_SCHEMA}},
+    "required": ["meals"],
+}
+
+_MULTI_SYSTEM = (
+    "You split a free-text description of everything someone ate into ONE OR MORE "
+    "distinct MEALS. Each meal is its own entry with an item list, meal_type "
+    "(breakfast/lunch/dinner/snack), optional location, a one-line description, and "
+    "confidence. Same per-item nutrition rules as always: as-eaten (cooked) portions "
+    "and grams, plus calories/protein/carbs/fat and sugar_g/fiber_g/sodium_mg/satfat_g. "
+    "Group foods sensibly (breakfast items together, a separate snack, etc.). If it's "
+    "clearly one meal, return a single-element list."
+)
+
+
+def extract_meals_multi(text: str) -> list[dict] | None:
+    """Parse free text into a LIST of meal extractions (each like extract_meal), or
+    None on stub/failure so the caller can fall back to a single-meal parse."""
+    out = client.call_tool(_MULTI_SYSTEM, f"What I ate:\n{text}", "record_meals", _MEALS_SCHEMA, max_tokens=2500)
+    if not out or not out.get("meals"):
+        return None
+    tag = f"{config.LLM_PROVIDER or config.LLM_KIND}-multi"
+    for m in out["meals"]:
+        m["extractor"] = tag
+    return out["meals"]
+
+
 # --- stub -----------------------------------------------------------------
 
 def _guess_meal_type(now: datetime, note: str) -> str:

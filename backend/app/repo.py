@@ -115,6 +115,30 @@ def get_meal(meal_id: str, user_id: str = config.DEFAULT_USER_ID) -> dict | None
         return meal
 
 
+def suggested_meals(
+    user_id: str = config.DEFAULT_USER_ID,
+    meal_type: str | None = None,
+    limit: int = 6,
+) -> list[dict]:
+    """Recent, distinct meals to quick-re-log — deduped by description and biased to
+    the current time-of-day meal_type. Full meals (with items) so the client can
+    re-log a copy in one tap."""
+    recent = list_meals(user_id, limit=80)
+    if meal_type:  # surface matching meal_type first (breakfasts in the morning, etc.)
+        recent = ([m for m in recent if m["meal_type"] == meal_type]
+                  + [m for m in recent if m["meal_type"] != meal_type])
+    seen: set[str] = set()
+    ids: list[str] = []
+    for m in recent:
+        key = (m.get("description") or "").strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            ids.append(m["id"])
+        if len(ids) >= limit:
+            break
+    return [full for mid in ids if (full := get_meal(mid, user_id))]
+
+
 # --- profile --------------------------------------------------------------
 
 def get_profile(user_id: str = config.DEFAULT_USER_ID) -> dict | None:

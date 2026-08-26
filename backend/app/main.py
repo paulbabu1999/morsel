@@ -8,7 +8,7 @@ token; the authenticated user_id flows into RLS so each user sees only their dat
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import (
@@ -40,6 +40,7 @@ from .models import (
     ProfileInput,
     QueryRequest,
     QueryResponse,
+    QuickLogRequest,
     RefineRequest,
     SignupRequest,
     StatsResponse,
@@ -173,12 +174,47 @@ def capture_refine(body: RefineRequest, user_id: str = CurrentUser) -> CaptureDr
     return CaptureDraft(**draft)
 
 
+@app.post("/capture/quicklog", response_model=list[CaptureDraft])
+def capture_quicklog(body: QuickLogRequest, user_id: str = CurrentUser) -> list[CaptureDraft]:
+    """Parse free text ('oatmeal + coffee for breakfast, a chicken bowl at lunch, an
+    apple') into one or more editable drafts. No DB write — confirm via /meals/batch."""
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Empty text")
+    return [CaptureDraft(**d) for d in capture_service.quicklog(body.text, body.source.value)]
+
+
 @app.post("/meals", response_model=Meal)
 def create_meal(body: MealCreate, user_id: str = CurrentUser) -> Meal:
     if not body.items:
         raise HTTPException(status_code=400, detail="A meal needs at least one item")
     meal = capture_service.build_meal(body.model_dump())
     return Meal(**repo.persist_meal(meal, user_id))
+
+
+@app.post("/meals/batch", response_model=list[Meal])
+def create_meals_batch(bodies: list[MealCreate], user_id: str = CurrentUser) -> list[Meal]:
+    """Persist several confirmed meals at once (the multi-meal quick-log flow)."""
+    out = []
+    for body in bodies:
+        if not body.items:
+            continue
+        meal = capture_service.build_meal(body.model_dump())
+        out.append(Meal(**repo.persist_meal(meal, user_id)))
+    if not out:
+        raise HTTPException(status_code=400, detail="No meals with items to save")
+    return out
+
+
+@app.get("/meals/suggestions", response_model=list[Meal])
+def meal_suggestions(
+    tz_offset: int = Query(0, ge=-840, le=840),
+    user_id: str = CurrentUser,
+) -> list[Meal]:
+    """A few recent meals to quick-re-log, biased to the current time of day."""
+    local = datetime.now() - timedelta(minutes=tz_offset)
+    h = local.hour
+    mt = "breakfast" if h < 11 else "lunch" if h < 15 else "snack" if h < 17 else "dinner"
+    return [Meal(**m) for m in repo.suggested_meals(user_id, meal_type=mt)]
 
 
 @app.get("/meals", response_model=list[Meal])

@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 from .foods import FOODS, LOCATIONS_BY_NAME
-from .llm.extract import extract_meal, refine_meal
+from .llm.extract import extract_meal, extract_meals_multi, refine_meal
 from .models import NUTRIENTS
 from .nutrition import resolve
 
@@ -174,6 +174,41 @@ def refine(
     }
     draft.update(_totals(resolved))
     return draft
+
+
+def quicklog(text: str, source: str = "phone") -> list[dict]:
+    """Parse free text into one or MORE unsaved meal drafts (natural-language logging
+    of a whole day at once). Falls back to a single-meal draft if multi-parse can't
+    run (stub/error)."""
+    extractions = extract_meals_multi(text)
+    if not extractions:
+        return [analyze(note=text, source=source)]
+    drafts = []
+    for ext in extractions:
+        confidence = float(ext.get("confidence", 0.85))
+        items = _resolve_items(ext.get("items", []), confidence)
+        if not items:
+            continue
+        mtype = ext.get("meal_type") or "snack"
+        loc = ext.get("location")
+        draft = {
+            "items": items,
+            "meal_type": mtype,
+            "location": loc,
+            "note": None,
+            "source": source,
+            "photo_uri": None,
+            "photo_uris": [],
+            "photo_count": 0,
+            "description": ext.get("description") or _describe(mtype, items, loc, None),
+            "tags": _tags(items, loc),
+            "confidence": round(confidence, 2),
+            "extractor": ext.get("extractor", "multi"),
+            "extraction_note": f"{len(items)} item(s), from your quick log.",
+        }
+        draft.update(_totals(items))
+        drafts.append(draft)
+    return drafts or [analyze(note=text, source=source)]
 
 
 def _normalize_eaten_at(eaten_at):

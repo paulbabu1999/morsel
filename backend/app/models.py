@@ -169,6 +169,13 @@ class MealCreate(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class QuickLogRequest(BaseModel):
+    """Free-text description of one or more meals to parse into drafts."""
+
+    text: str
+    source: CaptureSource = CaptureSource.phone
+
+
 class RefineRequest(BaseModel):
     """Apply a plain-language correction to a draft's items (re-estimate calories)."""
 
