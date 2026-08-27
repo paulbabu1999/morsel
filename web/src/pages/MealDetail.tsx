@@ -10,6 +10,7 @@ import {
 } from "../lib/format";
 import { ErrorState, Loading } from "../components/states";
 import { SourceBadge } from "../components/badges";
+import { ShareMeal } from "../components/ShareMeal";
 import { PhotoGallery } from "../components/PhotoGallery";
 import { IconArrowLeft, IconImage } from "../components/icons";
 
@@ -41,7 +42,10 @@ export function MealDetail() {
                 {meal.location_text ? ` · ${meal.location_text}` : ""}
               </p>
             </div>
-            <SourceBadge source={meal.source} />
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <ShareMeal mealId={meal.id} />
+              <SourceBadge source={meal.source} />
+            </div>
           </header>
 
           <div className="detail-grid">

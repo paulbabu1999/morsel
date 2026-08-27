@@ -270,6 +270,64 @@ export interface AuthResult {
 export interface AuthUser {
   user_id: string;
   email: string;
+  /** The name friends see. Null/absent until the user sets one. */
+  display_name?: string | null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Social layer (contract v2) — supportive accountability, never numbers
+ *
+ * The feed intentionally carries no calories/macros: a shared meal is a
+ * photo + description + optional note + who shared it. That's it.
+ * ------------------------------------------------------------------ */
+
+/** GET /auth/me — the signed-in user plus their (optional) display name. */
+export interface MeResponse {
+  user_id: string;
+  email: string;
+  display_name: string | null;
+}
+
+/** A person in search results or a connections list. */
+export interface UserSummary {
+  user_id: string;
+  display_name: string;
+  /** Whether the current user already follows this person. */
+  following: boolean;
+}
+
+/** GET /connections — who I follow and who follows me. */
+export interface Connections {
+  following: UserSummary[];
+  followers: Pick<UserSummary, "user_id" | "display_name">[];
+}
+
+/** A group the user owns or belongs to. `invite_code` is owner-only. */
+export interface GroupInfo {
+  id: string;
+  name: string;
+  invite_code: string | null;
+  member_count: number;
+  owner: boolean;
+}
+
+/**
+ * One shared meal in a feed. Deliberately free of calories/macros or any
+ * ranking — the social layer is encouragement, not comparison.
+ */
+export interface FeedItem {
+  id: string;
+  user_id: string;
+  display_name: string;
+  is_me: boolean;
+  group_id: string | null;
+  group_name: string | null;
+  meal_type: MealType;
+  description: string;
+  note: string | null;
+  photo_uri: string | null;
+  eaten_at: string | null;
+  shared_at: string;
 }
 
 /* ------------------------------------------------------------------ *
@@ -613,4 +671,89 @@ export const api = {
     }),
 
   queryExamples: () => request<string[]>("/query/examples"),
+
+  /* ---- Social: identity ---- */
+
+  /** The signed-in user + their display name (empty until they set one). */
+  getMe: () => request<MeResponse>("/auth/me"),
+
+  /** Set the name friends can find you by. */
+  setDisplayName: (display_name: string) =>
+    request<MeResponse>("/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ display_name }),
+    }),
+
+  /* ---- Social: people ---- */
+
+  /** Find people by name to follow. */
+  searchUsers: (q: string) =>
+    request<UserSummary[]>(`/users/search${toQuery({ q })}`),
+
+  followUser: (targetId: string) =>
+    request<{ ok: true }>(`/follow/${encodeURIComponent(targetId)}`, {
+      method: "POST",
+    }),
+
+  unfollowUser: (targetId: string) =>
+    request<{ ok: true }>(`/follow/${encodeURIComponent(targetId)}`, {
+      method: "DELETE",
+    }),
+
+  /** Who I follow + who follows me. */
+  getConnections: () => request<Connections>("/connections"),
+
+  /* ---- Social: groups ---- */
+
+  /** Create a group I own; the response carries its invite code. */
+  createGroup: (name: string) =>
+    request<GroupInfo>("/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+
+  /** Join a group by its invite code (404 if the code is unknown). */
+  joinGroup: (invite_code: string) =>
+    request<{ id: string; name: string }>("/groups/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invite_code }),
+    }),
+
+  /** Groups I own or belong to. */
+  getGroups: () => request<GroupInfo[]>("/groups"),
+
+  /** A group's shared-meal feed (403 if I'm not a member). */
+  getGroupFeed: (id: string) =>
+    request<FeedItem[]>(`/groups/${encodeURIComponent(id)}/feed`),
+
+  /* ---- Social: sharing + feed ---- */
+
+  /**
+   * Share a saved meal. Omitting `group_id` (or passing null) shares it to
+   * your followers; a group id shares it to that group only.
+   */
+  shareMeal: (
+    mealId: string,
+    body: { group_id?: string | null; note?: string | null } = {},
+  ) =>
+    request<{ shared_id: string }>(
+      `/meals/${encodeURIComponent(mealId)}/share`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    ),
+
+  /** Un-share a previously shared meal. */
+  unshare: (sharedId: string) =>
+    request<{ ok: true }>(`/shared/${encodeURIComponent(sharedId)}`, {
+      method: "DELETE",
+    }),
+
+  /** My home feed — meals shared by people I follow (and my own). */
+  getFeed: () => request<FeedItem[]>("/feed"),
 };

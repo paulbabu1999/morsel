@@ -4,11 +4,13 @@ import { useAsync } from "../lib/useAsync";
 import { useAuth } from "../lib/auth";
 import {
   IconAsk,
+  IconBell,
   IconCamera,
   IconHistory,
   IconHome,
   IconLogout,
   IconUser,
+  IconUsers,
 } from "./icons";
 
 const LINKS = [
@@ -16,6 +18,9 @@ const LINKS = [
   { to: "/dashboard", label: "Dashboard", Icon: IconHome, end: false },
   { to: "/history", label: "History", Icon: IconHistory, end: false },
   { to: "/ask", label: "Ask", Icon: IconAsk, end: false },
+  { to: "/feed", label: "Feed", Icon: IconUsers, end: false },
+  { to: "/friends", label: "Friends", Icon: IconUsers, end: false },
+  { to: "/reminders", label: "Reminders", Icon: IconBell, end: false },
   { to: "/profile", label: "Profile", Icon: IconUser, end: false },
 ];
 

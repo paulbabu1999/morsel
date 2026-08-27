@@ -14,6 +14,7 @@ import { PageHead } from "../components/ui";
 import { ErrorState, Loading } from "../components/states";
 import { SourceBadge } from "../components/badges";
 import { PhotoGallery } from "../components/PhotoGallery";
+import { ShareMeal } from "../components/ShareMeal";
 import {
   IconCamera,
   IconCheck,
@@ -1249,7 +1250,8 @@ function SavedMeal({ meal, onLogAnother }: { meal: Meal; onLogAnother: () => voi
         <MicroPill label="Sat fat" value={`${formatNumber(meal.total_satfat_g, 1)} g`} />
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+      <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <ShareMeal mealId={meal.id} />
         <Link className="btn btn-ghost" to={`/meals/${meal.id}`}>
           View full detail
         </Link>

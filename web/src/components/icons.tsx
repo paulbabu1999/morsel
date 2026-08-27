@@ -170,6 +170,34 @@ export const IconUser = (p: P) => (
   </svg>
 );
 
+/** Two people — the community / friends glyph. */
+export const IconUsers = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="9" cy="8" r="3.4" />
+    <path d="M3 20c0-3.4 2.7-5 6-5s6 1.6 6 5" />
+    <path d="M16 4.2a3.4 3.4 0 0 1 0 6.6" />
+    <path d="M17.5 15.2c2.2.6 3.5 2.1 3.5 4.8" />
+  </svg>
+);
+
+/** Bell — reminders / notifications. */
+export const IconBell = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
+    <path d="M10.2 20a2 2 0 0 0 3.6 0" />
+  </svg>
+);
+
+/** Share — a small node graph. */
+export const IconShare = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="18" cy="5" r="2.6" />
+    <circle cx="6" cy="12" r="2.6" />
+    <circle cx="18" cy="19" r="2.6" />
+    <path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4" />
+  </svg>
+);
+
 export const IconPlus = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 5v14M5 12h14" />

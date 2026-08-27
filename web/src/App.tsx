@@ -7,6 +7,10 @@ import { History } from "./pages/History";
 import { MealDetail } from "./pages/MealDetail";
 import { Ask } from "./pages/Ask";
 import { Profile } from "./pages/Profile";
+import { Feed } from "./pages/Feed";
+import { Friends } from "./pages/Friends";
+import { GroupFeed } from "./pages/GroupFeed";
+import { Reminders, useReminderScheduler } from "./pages/Reminders";
 import { Login } from "./pages/Login";
 import { ProfileProvider, useProfile } from "./lib/profile";
 import { useAuth } from "./lib/auth";
@@ -61,6 +65,7 @@ export function App() {
 function AppShell() {
   const { loaded, profile } = useProfile();
   const { pathname } = useLocation();
+  useReminderScheduler();
 
   // Onboarding gate: once the profile has loaded and is null, route the user
   // to the Profile page to set it up. Saving updates the shared context, which
@@ -84,6 +89,10 @@ function AppShell() {
             <Route path="/history" element={<History />} />
             <Route path="/meals/:id" element={<MealDetail />} />
             <Route path="/ask" element={<Ask />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/friends" element={<Friends />} />
+            <Route path="/groups/:id" element={<GroupFeed />} />
+            <Route path="/reminders" element={<Reminders />} />
             <Route path="/profile" element={<Profile />} />
             {/* Auth screens are public-only; once signed in, bounce home. */}
             <Route path="/login" element={<Navigate to="/" replace />} />

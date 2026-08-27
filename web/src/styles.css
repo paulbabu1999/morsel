@@ -2084,3 +2084,79 @@ button {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* ================= Social: feed, friends, groups, share ================= */
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-secondary); font-weight: 600; font-size: 14px; margin-bottom: 18px;
+}
+.back-link:hover { color: var(--text); }
+.back-link svg { width: 16px; height: 16px; }
+
+.feed-list { display: flex; flex-direction: column; gap: 16px; max-width: 620px; }
+.feed-card { padding: 16px 18px; }
+.feed-head { display: flex; align-items: center; gap: 12px; }
+.feed-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-weight: 800; font-size: 15px;
+  color: var(--brand-ink); background: var(--brand-grad);
+}
+.feed-avatar.me { background: var(--surface-3); color: var(--text-secondary); }
+.feed-head-text { flex: 1; min-width: 0; }
+.feed-who { font-size: 14px; color: var(--text-secondary); }
+.feed-name { font-weight: 700; color: var(--text); }
+.feed-mealtype { text-transform: capitalize; }
+.feed-group-chip {
+  display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; color: var(--route-semantic);
+  background: var(--route-semantic-soft);
+}
+.feed-when { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.feed-unshare { padding: 6px 10px; font-size: 13px; }
+.feed-photo {
+  width: 100%; aspect-ratio: 16 / 10; object-fit: cover;
+  border-radius: var(--r); margin: 14px 0 12px;
+}
+.feed-desc { font-weight: 600; color: var(--text); line-height: 1.45; margin-top: 12px; }
+.feed-note {
+  margin: 10px 0 0; padding: 8px 12px; border-left: 3px solid var(--brand);
+  background: var(--brand-soft); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: var(--text-secondary); font-style: italic;
+}
+
+/* people (search + connections) */
+.people-list { display: flex; flex-direction: column; gap: 8px; }
+.person-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface);
+}
+.person-name { flex: 1; font-weight: 600; color: var(--text); min-width: 0; }
+.person-row .btn { padding: 6px 14px; font-size: 13px; }
+.conn-sub {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+
+/* groups */
+.group-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.group-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r);
+}
+.group-icon {
+  width: 34px; height: 34px; border-radius: 10px; flex: none; display: grid; place-items: center;
+  color: var(--brand); background: var(--brand-soft);
+}
+.group-main { flex: 1; min-width: 0; }
+.group-name { font-weight: 700; color: var(--text); }
+.group-name:hover { color: var(--brand); }
+.group-meta { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+.invite-code {
+  font-family: ui-monospace, monospace; font-weight: 700; color: var(--text-secondary);
+  background: var(--surface-2); padding: 1px 6px; border-radius: 5px;
+}
+.group-actions { display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--border); padding-top: 16px; }
+
+/* share panel */
+.share-panel { padding: 16px 18px; margin-top: 4px; max-width: 360px; }
