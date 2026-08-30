@@ -139,6 +139,29 @@ def suggested_meals(
     return [full for mid in ids if (full := get_meal(mid, user_id))]
 
 
+# --- weight ---------------------------------------------------------------
+
+def add_weight(user_id: str, weight_kg: float, logged_at) -> dict:
+    import uuid
+    wid = f"w-{uuid.uuid4().hex[:10]}"
+    with db.app_tx(user_id) as cur:
+        cur.execute(
+            "INSERT INTO weight_logs (id, user_id, logged_at, weight_kg) VALUES (%s,%s,%s,%s)",
+            (wid, user_id, logged_at, float(weight_kg)),
+        )
+    return {"id": wid, "logged_at": logged_at, "weight_kg": round(float(weight_kg), 1)}
+
+
+def list_weights(user_id: str = config.DEFAULT_USER_ID, limit: int = 180) -> list[dict]:
+    with db.app_tx(user_id) as cur:
+        cur.execute(
+            "SELECT id, logged_at, weight_kg FROM weight_logs WHERE user_id = %s "
+            "ORDER BY logged_at ASC LIMIT %s",
+            (user_id, limit),
+        )
+        return cur.fetchall()
+
+
 # --- profile --------------------------------------------------------------
 
 def get_profile(user_id: str = config.DEFAULT_USER_ID) -> dict | None:

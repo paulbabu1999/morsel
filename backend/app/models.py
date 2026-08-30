@@ -170,6 +170,17 @@ class MealCreate(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class WeightLog(BaseModel):
+    id: str
+    logged_at: datetime
+    weight_kg: float
+
+
+class WeightLogInput(BaseModel):
+    weight_kg: float
+    logged_at: Optional[datetime] = None
+
+
 class QuickLogRequest(BaseModel):
     """Free-text description of one or more meals to parse into drafts."""
 

@@ -110,6 +110,13 @@ export interface Profile {
   updated_at: string;
 }
 
+/** One weigh-in. The dashboard shows a smoothed trend, not the raw daily number. */
+export interface WeightEntry {
+  id: string;
+  logged_at: string;
+  weight_kg: number;
+}
+
 /** Body for POST /profile. */
 export interface ProfileInput {
   age: number;
@@ -598,6 +605,17 @@ export const api = {
     request<Meal[]>(
       `/meals/suggestions${toQuery({ tz_offset: new Date().getTimezoneOffset() })}`,
     ),
+
+  /** Weight log (oldest → newest) for the trend. */
+  getWeights: () => request<WeightEntry[]>("/weight"),
+
+  /** Record a weigh-in (kg). */
+  logWeight: (weight_kg: number) =>
+    request<WeightEntry>("/weight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weight_kg }),
+    }),
 
   /** Step 1 of capture: analyze a photo/note into an editable draft (no DB write). */
   analyzeCapture: (input: CaptureInput) => {

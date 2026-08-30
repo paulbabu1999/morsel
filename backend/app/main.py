@@ -48,6 +48,8 @@ from .models import (
     ShareRequest,
     SignupRequest,
     StatsResponse,
+    WeightLog,
+    WeightLogInput,
 )
 
 CurrentUser = Depends(auth.current_user_id)
@@ -217,6 +219,21 @@ def set_profile(body: ProfileInput, user_id: str = CurrentUser) -> Profile:
     targets = recommend_targets(body.model_dump())
     saved = repo.upsert_profile({**body.model_dump(), **targets}, user_id)
     return Profile(**saved)
+
+
+# --- weight ----------------------------------------------------------------
+
+@app.get("/weight", response_model=list[WeightLog])
+def get_weights(user_id: str = CurrentUser) -> list[WeightLog]:
+    return [WeightLog(**w) for w in repo.list_weights(user_id)]
+
+
+@app.post("/weight", response_model=WeightLog)
+def log_weight(body: WeightLogInput, user_id: str = CurrentUser) -> WeightLog:
+    if not (20 <= body.weight_kg <= 400):
+        raise HTTPException(status_code=400, detail="Weight looks out of range")
+    at = capture_service._normalize_eaten_at(body.logged_at)
+    return WeightLog(**repo.add_weight(user_id, body.weight_kg, at))
 
 
 # --- capture ---------------------------------------------------------------

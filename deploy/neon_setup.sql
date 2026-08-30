@@ -256,3 +256,20 @@ CREATE INDEX IF NOT EXISTS shared_meals_user_idx ON shared_meals (user_id, share
 CREATE INDEX IF NOT EXISTS shared_meals_group_idx ON shared_meals (group_id, shared_at DESC);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON follows, groups, group_members, shared_meals TO morsel_app;
+
+-- ---------------------------------------------------------------------------
+-- Weight log — per-user, RLS-scoped like meals. A smoothed trend (client-side)
+-- keeps daily fluctuations from discouraging people.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS weight_logs (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    logged_at  TIMESTAMP NOT NULL,
+    weight_kg  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS weight_logs_user_idx ON weight_logs (user_id, logged_at);
+ALTER TABLE weight_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE weight_logs FORCE  ROW LEVEL SECURITY;
+CREATE POLICY weight_logs_isolation ON weight_logs
+    USING (user_id = current_setting('app.current_user_id', true));
+GRANT SELECT, INSERT, UPDATE, DELETE ON weight_logs TO morsel_app;

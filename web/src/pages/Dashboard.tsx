@@ -28,6 +28,7 @@ import { PageHead, Kpi } from "../components/ui";
 import { ErrorState, Loading, EmptyState } from "../components/states";
 import { MealCardCompact } from "../components/MealCard";
 import { CalorieRing, NutrientBar } from "../components/nutrition";
+import { WeightCard } from "../components/WeightCard";
 import {
   IconBolt,
   IconFlame,
@@ -292,6 +293,11 @@ function DashboardBody({
       ) : (
         <ProfilePrompt />
       )}
+
+      {/* ---- Weight trend (the goal is to lose weight) ---- */}
+      <div className="section-gap">
+        <WeightCard />
+      </div>
 
       {/* ---- Micronutrient adequacy ---- */}
       {targets && micros.length > 0 && (

@@ -184,6 +184,19 @@ CREATE POLICY meal_items_isolation ON meal_items
 CREATE POLICY user_profile_isolation ON user_profile
     USING (user_id = current_setting('app.current_user_id', true));
 
+-- Weight log — per-user, RLS-scoped like meals.
+CREATE TABLE weight_logs (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    logged_at  TIMESTAMP NOT NULL,
+    weight_kg  REAL NOT NULL
+);
+CREATE INDEX weight_logs_user_idx ON weight_logs (user_id, logged_at);
+ALTER TABLE weight_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE weight_logs FORCE  ROW LEVEL SECURITY;
+CREATE POLICY weight_logs_isolation ON weight_logs
+    USING (user_id = current_setting('app.current_user_id', true));
+
 -- ---------------------------------------------------------------------------
 -- Social layer (follows, groups, shared meals). Cross-user by nature, so NO
 -- row-level security — visibility is enforced in app/social.py queries. Sharing

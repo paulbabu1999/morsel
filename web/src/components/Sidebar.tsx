@@ -27,11 +27,7 @@ const LINKS = [
 function HealthPill() {
   const { data, loading, error } = useAsync(() => api.health(), []);
   const status = loading ? "pending" : error ? "down" : "ok";
-  const text = loading
-    ? "Connecting…"
-    : error
-      ? "Backend offline"
-      : `Demo · ${data?.db.meals ?? 0} sample meals`;
+  const text = loading ? "Connecting…" : error ? "Backend offline" : "Connected";
   const tip = error ?? (data ? `Storage: Postgres · LLM: ${data.llm}` : "");
   return (
     <div className="demo-pill" title={tip}>
