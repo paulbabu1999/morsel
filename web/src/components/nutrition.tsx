@@ -9,7 +9,10 @@ export const STATUS_META: Record<
   low: { color: "#f0a742", label: "Low" }, // amber — under a target
   ok: { color: "#22c58b", label: "On track" }, // green
   high: { color: "#3987e5", label: "High" }, // blue — above target / near limit
-  over: { color: "#e66767", label: "Over" }, // red — exceeded a limit
+  // "Over" a limit is still shown, but in the same calm terracotta as the
+  // calorie ring's over-goal tone — informative, never an alarm red (per the
+  // psychology review: don't make being over obvious/shaming).
+  over: { color: "#d98a5e", label: "Over" },
   unknown: { color: "#6f7889", label: "No target" }, // gray
 };
 

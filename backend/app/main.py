@@ -86,6 +86,10 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
+# Upload caps for /capture/analyze (the only endpoint that ingests binary data).
+_MAX_IMAGE_BYTES = 12 * 1024 * 1024        # 12 MB per photo
+_MAX_TOTAL_UPLOAD_BYTES = 30 * 1024 * 1024  # 30 MB per request
+
 
 @app.get("/health")
 def health() -> dict:
@@ -251,7 +255,20 @@ def capture_analyze(
     files = list(photos or [])
     if photo:
         files.append(photo)
-    images = [(f.file.read(), f.content_type or "image/jpeg") for f in files]
+    # Bound uploads: the free host has ~512 MB RAM and each photo is read fully
+    # into memory (then sent to the vision model). Reject oversized files up front
+    # so a large/hostile upload can't OOM the process. Phone photos are 2-8 MB.
+    images: list[tuple[bytes, str]] = []
+    total = 0
+    for f in files:
+        size = getattr(f, "size", None)
+        if size is not None and size > _MAX_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="Each photo must be under 12 MB.")
+        data = f.file.read()
+        total += len(data)
+        if len(data) > _MAX_IMAGE_BYTES or total > _MAX_TOTAL_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Photos are too large — keep the total under 30 MB.")
+        images.append((data, f.content_type or "image/jpeg"))
     draft = capture_service.analyze(
         note=note, images=images or None,
         meal_type=meal_type.value if meal_type else None,
