@@ -7,6 +7,7 @@ import { colors, font, radius, spacing } from '../theme';
 import { Header } from '../components/Header';
 import { Button, Card, SectionTitle } from '../components/ui';
 import { CalorieRing, AdequacyBar } from '../components/Nutrition';
+import { WeightCard } from '../components/WeightCard';
 import { Loading, ErrorView, EmptyView } from '../components/StateViews';
 import {
   getInsights,
@@ -143,6 +144,14 @@ function StatsContent({
         )}
       </Card>
 
+      {/* Consistency — adherence (>3 days/week) predicts weight loss, not perfection */}
+      <ConsistencyStrip days={data.logged_days_7d} />
+
+      {/* Weight trend — smoothed EMA so a noisy day never reads as "you gained" */}
+      <View style={styles.weightWrap}>
+        <WeightCard />
+      </View>
+
       {/* Nutrient adequacy — micros vs. targets/limits */}
       {targets && adequacy.length ? (
         <>
@@ -248,6 +257,30 @@ function InsightRow({ item, last }: { item: Insight; last: boolean }) {
   );
 }
 
+function ConsistencyStrip({ days }: { days: number }) {
+  const filled = Math.min(Math.max(days, 0), 7);
+  return (
+    <Card style={styles.consistencyCard}>
+      <View style={styles.consistencyTop}>
+        <Text style={styles.consistencyLabel}>Consistency</Text>
+        <Text style={styles.consistencyCount}>
+          {filled} of 7 day{filled === 1 ? '' : 's'}
+        </Text>
+      </View>
+      <View style={styles.dotRow}>
+        {Array.from({ length: 7 }).map((_, i) => (
+          <View key={i} style={[styles.cDot, i < filled ? styles.cDotOn : styles.cDotOff]} />
+        ))}
+      </View>
+      <Text style={styles.consistencyHint}>
+        {filled >= 3
+          ? 'Steady logging is what moves the needle — nice work.'
+          : 'Logging most days is the habit that matters, not perfection.'}
+      </Text>
+    </Card>
+  );
+}
+
 function Kpi({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
     <View style={styles.kpi}>
@@ -330,6 +363,17 @@ const styles = StyleSheet.create({
   setupTitle: { fontSize: font.h3, fontWeight: '800', color: colors.text, marginBottom: spacing.xs },
   setupBody: { fontSize: font.small, color: colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: spacing.lg },
   setupBtn: { alignSelf: 'stretch', paddingHorizontal: spacing.xl },
+
+  consistencyCard: { marginBottom: spacing.md },
+  consistencyTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  consistencyLabel: { fontSize: font.h3, fontWeight: '700', color: colors.text },
+  consistencyCount: { fontSize: font.small, fontWeight: '700', color: colors.textMuted },
+  dotRow: { flexDirection: 'row', gap: spacing.sm },
+  cDot: { flex: 1, height: 10, borderRadius: 5 },
+  cDotOn: { backgroundColor: colors.primary },
+  cDotOff: { backgroundColor: colors.surfaceAlt },
+  consistencyHint: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md, lineHeight: 19 },
+  weightWrap: { marginBottom: spacing.md },
 
   adqCard: { marginBottom: spacing.md },
 

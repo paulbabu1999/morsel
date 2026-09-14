@@ -5,6 +5,7 @@ import { colors, font, radius, spacing } from '../theme';
 import { Card, SectionTitle, SourceBadge, Tag } from '../components/ui';
 import { MacroRow } from '../components/Macros';
 import { NutrientChips } from '../components/Nutrition';
+import { ShareMealButton } from '../components/ShareMealButton';
 import { Loading, ErrorView } from '../components/StateViews';
 import { getMeal, type Meal } from '../api';
 import { useAsync } from '../hooks/useAsync';
@@ -48,6 +49,8 @@ export function MealDetailScreen({ route }: { route: RouteProp<RootStackParamLis
           variant="full"
         />
       </View>
+
+      <ShareMealButton mealId={meal.id} />
 
       <SectionTitle style={styles.section}>Micronutrients</SectionTitle>
       <Card>

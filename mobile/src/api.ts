@@ -18,7 +18,8 @@ export type QueryRoute = 'aggregate' | 'semantic' | 'hybrid';
 export type Sex = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 export type GoalType = 'lose' | 'maintain' | 'gain';
-export type ResolutionMethod = 'alias' | 'similar' | 'usda' | 'fallback';
+// Base tiers plus their runtime variants ("usda+anchored", "off", "fallback-uncached").
+export type ResolutionMethod = 'alias' | 'similar' | 'usda' | 'off' | 'fallback' | string;
 
 /** The full nutrient set every item/meal carries (meal totals are `total_`-prefixed). */
 export interface Nutrients {
@@ -54,6 +55,7 @@ export interface Meal {
   meal_type: MealType;
   location_text: string | null;
   photo_uri: string | null;
+  photo_uris?: string[]; // all photos for this meal (primary = photo_uri)
   note_text: string | null;
   description: string;
   tags: string[];
@@ -207,6 +209,8 @@ export interface StatsResponse {
   end: string;
   total_meals: number;
   total_calories: number;
+  days_tracked: number; // distinct days logged in the window (the avg divisor)
+  logged_days_7d: number; // distinct days logged in the last 7 (consistency signal)
   avg_calories_per_day: number;
   avg_protein_per_day: number;
   eat_out_meals: number;
@@ -363,7 +367,7 @@ function notifyAuthExpired(): void {
 // ---------------------------------------------------------------------------
 
 interface RequestOptions {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: BodyInit;
   headers?: Record<string, string>;
   /**
@@ -583,4 +587,209 @@ export function getInsights(period: StatsPeriod = 'week'): Promise<InsightsRespo
   return request<InsightsResponse>(
     `/insights?period=${period}&tz_offset=${new Date().getTimezoneOffset()}`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Weight tracking
+// ---------------------------------------------------------------------------
+
+/** One weigh-in. The Stats screen smooths these into a trend (see WeightCard). */
+export interface WeightEntry {
+  id: string;
+  logged_at: string;
+  weight_kg: number;
+}
+
+/** Weigh-ins, oldest → newest. */
+export function getWeights(): Promise<WeightEntry[]> {
+  return request<WeightEntry[]>('/weight');
+}
+
+/** Record a weigh-in (kg). 400 if outside the 20–400 kg sanity range. */
+export function logWeight(weight_kg: number, logged_at?: string): Promise<WeightEntry> {
+  return request<WeightEntry>('/weight', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weight_kg, logged_at: logged_at ?? null }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Multi-meal quick-log + refine + suggestions
+// ---------------------------------------------------------------------------
+
+/** Parse free text ("oatmeal + coffee, a chicken bowl for lunch, an apple") into
+ *  one or more editable drafts. No DB write — confirm via createMealsBatch. */
+export function quickLog(text: string, source: CaptureSource = 'phone'): Promise<CaptureDraft[]> {
+  return request<CaptureDraft[]>('/capture/quicklog', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, source }),
+  });
+}
+
+/** Persist several confirmed drafts at once (the quick-log flow). */
+export function createMealsBatch(bodies: MealCreate[]): Promise<Meal[]> {
+  return request<Meal[]>('/meals/batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bodies),
+  });
+}
+
+/** A few recent meals to quick-re-log, biased to the current time of day. */
+export function getSuggestions(): Promise<Meal[]> {
+  return request<Meal[]>(`/meals/suggestions?tz_offset=${new Date().getTimezoneOffset()}`);
+}
+
+/** One item in a refine call — mirrors DraftItem. */
+export interface RefineItem {
+  name: string;
+  quantity: number;
+  unit?: string | null;
+  grams?: number | null;
+  calories?: number | null;
+}
+
+/** Re-estimate a draft from a plain-language correction ("the dal is cooked, ~200 cal"). */
+export function refineCapture(params: {
+  items: RefineItem[];
+  correction: string;
+  meal_type?: MealType | null;
+  location?: string | null;
+  note?: string | null;
+  source?: CaptureSource;
+  photo_uris?: string[] | null;
+}): Promise<CaptureDraft> {
+  return request<CaptureDraft>('/capture/refine', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'phone', ...params }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Social — identity, follows, groups, sharing, feed
+//
+// The feed deliberately carries NO calories/macros: a shared meal is a photo +
+// description + optional note + who shared it. Supportive, not a scoreboard.
+// ---------------------------------------------------------------------------
+
+export interface MeResponse {
+  user_id: string;
+  email: string;
+  display_name: string | null;
+}
+
+/** A person in search results / connections. */
+export interface UserSummary {
+  user_id: string;
+  display_name: string;
+  following?: boolean;
+}
+
+export interface Connections {
+  following: UserSummary[];
+  followers: UserSummary[];
+}
+
+export interface GroupInfo {
+  id: string;
+  name: string;
+  member_count: number;
+  owner: boolean;
+  invite_code: string | null; // only the owner sees it (to hand out)
+}
+
+/** One shared meal in a feed. Free of calories/macros by design. */
+export interface FeedItem {
+  id: string;
+  user_id: string;
+  display_name: string;
+  is_me: boolean;
+  group_id: string | null;
+  group_name: string | null;
+  meal_type: MealType | null;
+  description: string;
+  note: string | null;
+  photo_uri: string | null;
+  eaten_at: string | null;
+  shared_at: string;
+}
+
+/** Current identity incl. display name (for the Community screen). */
+export function getMe(): Promise<MeResponse> {
+  return request<MeResponse>('/auth/me');
+}
+
+/** Set my public display name (how friends find/see me). */
+export function setDisplayName(display_name: string): Promise<MeResponse> {
+  return request<MeResponse>('/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display_name }),
+  });
+}
+
+/** Find people by display name (excludes me). */
+export function searchUsers(q: string): Promise<UserSummary[]> {
+  return request<UserSummary[]>(`/users/search?q=${encodeURIComponent(q)}`);
+}
+
+export function followUser(userId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/follow/${encodeURIComponent(userId)}`, { method: 'POST' });
+}
+
+export function unfollowUser(userId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/follow/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+export function getConnections(): Promise<Connections> {
+  return request<Connections>('/connections');
+}
+
+export function createGroup(name: string): Promise<GroupInfo> {
+  return request<GroupInfo>('/groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function joinGroup(invite_code: string): Promise<{ id: string; name: string }> {
+  return request<{ id: string; name: string }>('/groups/join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invite_code }),
+  });
+}
+
+export function getGroups(): Promise<GroupInfo[]> {
+  return request<GroupInfo[]>('/groups');
+}
+
+/** A group's shared-meal feed (403 → ApiError if I'm not a member). */
+export function getGroupFeed(groupId: string): Promise<FeedItem[]> {
+  return request<FeedItem[]>(`/groups/${encodeURIComponent(groupId)}/feed`);
+}
+
+/** Share a meal to my followers (group_id null) or to a specific group. */
+export function shareMeal(
+  mealId: string,
+  params: { group_id?: string | null; note?: string | null } = {},
+): Promise<{ shared_id: string }> {
+  return request<{ shared_id: string }>(`/meals/${encodeURIComponent(mealId)}/share`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ group_id: params.group_id ?? null, note: params.note ?? null }),
+  });
+}
+
+export function unshare(sharedId: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/shared/${encodeURIComponent(sharedId)}`, { method: 'DELETE' });
+}
+
+/** My home feed — meals shared by people I follow, my groups, and my own. */
+export function getFeed(): Promise<FeedItem[]> {
+  return request<FeedItem[]>('/feed');
 }

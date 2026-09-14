@@ -13,9 +13,13 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { CaptureScreen } from './src/screens/CaptureScreen';
 import { FeedScreen } from './src/screens/FeedScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
+import { CommunityScreen } from './src/screens/CommunityScreen';
 import { AskScreen } from './src/screens/AskScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { MealDetailScreen } from './src/screens/MealDetailScreen';
+import { FriendsScreen } from './src/screens/FriendsScreen';
+import { GroupsScreen } from './src/screens/GroupsScreen';
+import { GroupFeedScreen } from './src/screens/GroupFeedScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -24,6 +28,7 @@ const TAB_ICON: Record<keyof RootTabParamList, string> = {
   Capture: '📷',
   Feed: '🍱',
   Stats: '📊',
+  Community: '🤝',
   Ask: '✨',
   Profile: '👤',
 };
@@ -53,8 +58,9 @@ function Tabs() {
       })}
     >
       <Tab.Screen name="Capture" component={CaptureScreen} />
-      <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Feed" component={FeedScreen} options={{ tabBarLabel: 'History' }} />
       <Tab.Screen name="Stats" component={StatsScreen} />
+      <Tab.Screen name="Community" component={CommunityScreen} />
       <Tab.Screen name="Ask" component={AskScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -79,6 +85,13 @@ function AppNavigator() {
           name="MealDetail"
           component={MealDetailScreen}
           options={{ title: 'Meal', headerBackTitle: 'Back' }}
+        />
+        <RootStack.Screen name="Friends" component={FriendsScreen} options={{ title: 'Friends', headerBackTitle: 'Back' }} />
+        <RootStack.Screen name="Groups" component={GroupsScreen} options={{ title: 'Groups', headerBackTitle: 'Back' }} />
+        <RootStack.Screen
+          name="GroupFeed"
+          component={GroupFeedScreen}
+          options={({ route }) => ({ title: route.params.name, headerBackTitle: 'Back' })}
         />
       </RootStack.Navigator>
     </NavigationContainer>

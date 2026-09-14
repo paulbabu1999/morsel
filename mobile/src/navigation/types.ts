@@ -4,12 +4,16 @@
 export type RootStackParamList = {
   Tabs: undefined;
   MealDetail: { mealId: string };
+  Friends: undefined;
+  Groups: undefined;
+  GroupFeed: { groupId: string; name: string };
 };
 
 export type RootTabParamList = {
   Capture: undefined;
   Feed: undefined;
   Stats: undefined;
+  Community: undefined;
   Ask: undefined;
   Profile: undefined;
 };

@@ -18,6 +18,8 @@ import { Header } from '../components/Header';
 import { Button, Card, SectionTitle, Tag } from '../components/ui';
 import { MacroRow } from '../components/Macros';
 import { NutrientChips } from '../components/Nutrition';
+import { Suggestions } from '../components/Suggestions';
+import { QuickLog } from '../components/QuickLog';
 import {
   ApiError,
   analyzeCapture,
@@ -241,6 +243,9 @@ export function CaptureScreen() {
               error={error}
             />
           ) : (
+            <>
+            <Suggestions onLogged={(m) => setSaved(m)} />
+            <QuickLog />
             <CaptureForm
               source={source}
               imageUris={imageUris}
@@ -261,6 +266,7 @@ export function CaptureScreen() {
               onClearPhotos={clearPhotos}
               onAnalyze={analyze}
             />
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>

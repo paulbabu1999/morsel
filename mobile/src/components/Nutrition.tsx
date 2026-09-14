@@ -114,7 +114,9 @@ export function CalorieRing({
   const pct = target > 0 ? intake / target : 0;
   const over = target > 0 && intake > target;
   const remaining = Math.round(target - intake);
-  const ringColor = over ? colors.danger : colors.primary;
+  // Over goal shows in the calm terracotta, never an alarm red — a single day over
+  // is noise, and shaming the number is what makes people quit (matches the web).
+  const ringColor = over ? colors.primaryDark : colors.primary;
   return (
     <View style={styles.calorieWrap}>
       <ProgressRing progress={pct} color={ringColor}>
@@ -141,7 +143,7 @@ export function adequacyColor(status: AdequacyStatus, kind: AdequacyKind): strin
     case 'low':
       return colors.carbs; // under a target you want to hit
     case 'over':
-      return colors.danger; // exceeded a limit
+      return colors.primaryDark; // exceeded a limit — calm terracotta, not alarm red
     case 'high':
       return kind === 'limit' ? colors.carbs : colors.hybrid; // near a limit / well above a target
     default:
@@ -219,9 +221,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 3,
   },
-  caloriePillOver: { backgroundColor: colors.dangerSoft },
+  caloriePillOver: { backgroundColor: colors.surfaceAlt },
   caloriePillText: { fontSize: font.tiny, fontWeight: '800', color: colors.primaryDark, letterSpacing: 0.3 },
-  caloriePillTextOver: { color: colors.danger },
+  caloriePillTextOver: { color: colors.textMuted },
   calorieCaption: { fontSize: font.small, color: colors.textMuted, marginTop: spacing.md, textAlign: 'center' },
 
   adqRow: { marginBottom: spacing.lg },
