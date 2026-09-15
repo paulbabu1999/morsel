@@ -280,9 +280,8 @@ export class ApiError extends Error {
 
 const NETWORK_HINT =
   `Could not reach the backend at ${API_URL}.\n\n` +
-  '• Start it: cd backend && ./run.sh (serves http://localhost:8000)\n' +
-  "• On a physical phone, edit src/config.ts and set API_URL to your computer's " +
-  'LAN IP (e.g. http://192.168.1.42:8000), on the same Wi-Fi.';
+  'The free-tier server may be waking up from idle — the first request after a ' +
+  'while can take 30–60s. Please check your connection and try again in a moment.';
 
 // ---------------------------------------------------------------------------
 // Auth token storage

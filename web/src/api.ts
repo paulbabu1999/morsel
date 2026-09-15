@@ -2,11 +2,28 @@
  * Typed API client for the Bite backend (contract v2).
  *
  * All shapes mirror API_CONTRACT.md exactly. The base URL comes from
- * `VITE_API_URL` and falls back to http://localhost:8000 for local dev.
+ * `VITE_API_URL` when set at build time; otherwise it's derived from where the
+ * app is actually running, so a production deploy talks to the hosted backend
+ * even if VITE_API_URL wasn't provided at build (a missing build var must never
+ * silently point the live site at localhost).
  */
 
+// The hosted backend (Render). Kept in sync with mobile/src/config.ts.
+const HOSTED_API = "https://morsel-api-9s89.onrender.com";
+
+function defaultApiUrl(): string {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const isLocal =
+      !host || host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
+    // Served from a real domain (Cloudflare Pages, etc.) → use the hosted API.
+    if (!isLocal) return HOSTED_API;
+  }
+  return "http://localhost:8000";
+}
+
 export const API_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+  import.meta.env.VITE_API_URL?.replace(/\/$/, "") || defaultApiUrl();
 
 /* ------------------------------------------------------------------ *
  * Types (mirror the backend contract)
@@ -430,7 +447,9 @@ async function request<T>(
 
   const unreachable = () =>
     new ApiError(
-      `Can't reach the backend at ${API_URL}. Start it on :8000 and try again.`,
+      API_URL.includes("localhost")
+        ? `Can't reach the backend at ${API_URL}. Start it on :8000 and try again.`
+        : "Can't reach the backend — the free server may be waking up from idle (up to ~60s). Please try again in a moment.",
     );
 
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
