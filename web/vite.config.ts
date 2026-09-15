@@ -34,6 +34,12 @@ export default defineConfig({
       workbox: {
         navigateFallback: "index.html",
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // Take control of open pages as soon as a new worker installs, and drop
+        // stale precaches — so a deploy propagates without users getting stuck on
+        // an old bundle (paired with the controllerchange reload in main.tsx).
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],
