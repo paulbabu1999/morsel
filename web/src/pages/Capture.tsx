@@ -708,7 +708,10 @@ function QuickLogReview({
           <div className="state-title">
             Saved {savedCount} meal{savedCount === 1 ? "" : "s"}
           </div>
-          <div className="state-msg">They're in your history with full nutrition.</div>
+          <div className="state-msg">
+            They're in your history with full nutrition — open any one to share it with
+            friends.
+          </div>
           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
             <Link className="btn btn-ghost" to="/history">
               See history

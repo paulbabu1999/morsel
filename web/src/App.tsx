@@ -12,6 +12,7 @@ import { Friends } from "./pages/Friends";
 import { GroupFeed } from "./pages/GroupFeed";
 import { Reminders, useReminderScheduler } from "./pages/Reminders";
 import { Login } from "./pages/Login";
+import { Invite } from "./pages/Invite";
 import { ProfileProvider, useProfile } from "./lib/profile";
 import { useAuth } from "./lib/auth";
 import { Loading } from "./components/states";
@@ -49,6 +50,9 @@ export function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Login />} />
+        {/* Invite links must be reachable logged-out — it stashes the token and
+            sends the visitor to sign in, then redeems after. */}
+        <Route path="/invite/:token" element={<Invite />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -70,7 +74,10 @@ function AppShell() {
   // Onboarding gate: once the profile has loaded and is null, route the user
   // to the Profile page to set it up. Saving updates the shared context, which
   // clears this redirect. Errors fall through so the app is still usable.
-  const needsOnboarding = loaded && profile === null && pathname !== "/profile";
+  // Let invite links redeem before the onboarding gate takes over, so a brand-new
+  // signup arriving via an invite still gets connected to their friend.
+  const needsOnboarding =
+    loaded && profile === null && pathname !== "/profile" && !pathname.startsWith("/invite");
 
   return (
     <div className="app-shell">
@@ -95,6 +102,7 @@ function AppShell() {
             <Route path="/groups/:id" element={<GroupFeed />} />
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/invite/:token" element={<Invite />} />
             {/* Auth screens are public-only; once signed in, bounce home. */}
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />

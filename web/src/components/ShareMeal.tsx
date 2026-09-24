@@ -43,8 +43,8 @@ export function ShareMeal({ mealId }: { mealId: string }) {
 
   if (!open) {
     return (
-      <button className="btn btn-ghost" onClick={() => setOpen(true)}>
-        <IconShare width={16} height={16} /> Share
+      <button className="btn btn-share" onClick={() => setOpen(true)}>
+        <IconShare width={16} height={16} /> Share with friends
       </button>
     );
   }

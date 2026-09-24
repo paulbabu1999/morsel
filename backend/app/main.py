@@ -34,6 +34,7 @@ from .models import (
     GroupCreateRequest,
     GroupJoinRequest,
     InsightsResponse,
+    InviteAcceptRequest,
     LoginRequest,
     Meal,
     MealCreate,
@@ -208,6 +209,26 @@ def unshare(shared_id: str, user_id: str = CurrentUser) -> dict:
 @app.get("/feed")
 def get_feed(user_id: str = CurrentUser) -> list[dict]:
     return social.feed(user_id)
+
+
+@app.get("/invite/token")
+def invite_token(user_id: str = CurrentUser) -> dict:
+    """A shareable link token so a friend can connect (mutually follow) in one tap."""
+    return {"token": auth.create_invite_token(user_id)}
+
+
+@app.post("/invite/accept")
+def invite_accept(body: InviteAcceptRequest, user_id: str = CurrentUser) -> dict:
+    inviter_id = auth.decode_invite_token(body.token)
+    if not inviter_id:
+        raise HTTPException(status_code=400, detail="This invite link is invalid or expired.")
+    if inviter_id == user_id:
+        return {"ok": True, "self": True, "display_name": None}
+    inviter = repo.get_user(inviter_id)
+    if not inviter:
+        raise HTTPException(status_code=400, detail="This invite is no longer valid.")
+    social.connect_mutual(user_id, inviter_id)
+    return {"ok": True, "self": False, "display_name": inviter.get("display_name") or "your friend"}
 
 
 # --- profile ---------------------------------------------------------------

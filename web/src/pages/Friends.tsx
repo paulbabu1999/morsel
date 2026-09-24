@@ -5,7 +5,7 @@ import type { Connections, GroupInfo, MeResponse, UserSummary } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { PageHead } from "../components/ui";
 import { ErrorState, Loading } from "../components/states";
-import { IconCheck, IconPlus, IconUsers } from "../components/icons";
+import { IconCheck, IconPlus, IconShare, IconUsers } from "../components/icons";
 
 /** Friends & groups: set the name people find you by, follow friends, and manage
  *  groups. Supportive accountability by design — no numbers anywhere. */
@@ -25,6 +25,7 @@ export function Friends() {
       <div className="grid two-col">
         <div className="grid" style={{ gap: 20 }}>
           <YourName me={me} />
+          <InviteFriend />
           <FindPeople onChanged={() => connections.reload()} />
           <ConnectionsCard c={connections} />
         </div>
@@ -97,6 +98,82 @@ function YourName({ me }: { me: ReturnType<typeof useAsync<MeResponse>> }) {
   );
 }
 
+/* ---------- Invite a friend (one-tap connect link) ---------- */
+function InviteFriend() {
+  const [link, setLink] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      setCopied(false); // clipboard blocked — the link is shown to copy by hand
+    }
+  }
+
+  async function makeLink() {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const { token } = await api.getInviteToken();
+      const url = `${window.location.origin}/invite/${token}`;
+      setLink(url);
+      await copyText(url);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card card-pad">
+      <div className="card-head">
+        <div className="card-title">Invite a friend</div>
+        <div className="card-hint">easiest way to connect</div>
+      </div>
+      <div className="card-hint" style={{ marginBottom: 12 }}>
+        Send a friend your link. When they open it you'll follow each other
+        automatically — no searching, no codes.
+      </div>
+      {link ? (
+        <>
+          <div className="invite-link-row">
+            <input
+              className="input"
+              readOnly
+              value={link}
+              onFocus={(e) => e.currentTarget.select()}
+              aria-label="Your invite link"
+            />
+            <button className="btn btn-primary" onClick={() => copyText(link)}>
+              {copied ? <IconCheck width={16} height={16} /> : null}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          {copied && (
+            <div className="card-hint" style={{ marginTop: 8, color: "var(--good)" }}>
+              Link copied — paste it to a friend in any app.
+            </div>
+          )}
+        </>
+      ) : (
+        <button className="btn btn-primary" onClick={makeLink} disabled={busy}>
+          <IconShare width={16} height={16} />
+          {busy ? "Creating…" : "Create invite link"}
+        </button>
+      )}
+      {err && (
+        <div className="card-hint" style={{ marginTop: 8, color: "var(--danger)" }}>{err}</div>
+      )}
+    </section>
+  );
+}
+
 /* ---------- Find people ---------- */
 function FindPeople({ onChanged }: { onChanged: () => void }) {
   const [q, setQ] = useState("");
@@ -140,6 +217,12 @@ function FindPeople({ onChanged }: { onChanged: () => void }) {
           {searching ? "Searching…" : "Search"}
         </button>
       </form>
+
+      <div className="card-hint" style={{ marginTop: 10 }}>
+        Search a friend's <b>display name</b> — they'll only show up if they've saved one
+        too. The easiest way to connect specific people is to start a <b>group</b> and
+        share its invite code.
+      </div>
 
       {error && <div className="card-hint" style={{ marginTop: 12, color: "var(--danger)" }}>{error}</div>}
 

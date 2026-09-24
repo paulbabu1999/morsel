@@ -76,6 +76,18 @@ def unfollow(user_id: str, target_id: str) -> None:
         cur.execute("DELETE FROM follows WHERE follower_id = %s AND followee_id = %s", (user_id, target_id))
 
 
+def connect_mutual(user_id: str, other_id: str) -> None:
+    """Make two users follow each other — the one-tap result of an invite link."""
+    if not other_id or user_id == other_id:
+        return
+    with db.app_tx(user_id) as cur:
+        cur.execute(
+            "INSERT INTO follows (follower_id, followee_id) VALUES (%s, %s), (%s, %s) "
+            "ON CONFLICT DO NOTHING",
+            (user_id, other_id, other_id, user_id),
+        )
+
+
 def connections(user_id: str) -> dict:
     with db.app_tx(user_id) as cur:
         cur.execute(

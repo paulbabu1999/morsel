@@ -50,6 +50,23 @@ def decode_token(token: str) -> str | None:
         return None
 
 
+# --- invite links ----------------------------------------------------------
+
+def create_invite_token(user_id: str) -> str:
+    """A shareable, signed invite token (30-day expiry) that maps back to the
+    inviter. Reuses the JWT machinery so no extra table is needed."""
+    exp = datetime.now(timezone.utc) + timedelta(days=30)
+    return jwt.encode({"inv": user_id, "exp": exp}, config.JWT_SECRET, algorithm="HS256")
+
+
+def decode_invite_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, config.JWT_SECRET, algorithms=["HS256"])
+        return payload.get("inv")
+    except Exception:
+        return None
+
+
 def current_user_id(creds: HTTPAuthorizationCredentials = Depends(_security)) -> str:
     """FastAPI dependency: the authenticated user's id, or 401."""
     uid = decode_token(creds.credentials)

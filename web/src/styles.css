@@ -486,6 +486,19 @@ button {
 .btn-ghost:hover {
   background: var(--surface-2);
 }
+/* Share — a friendly brand-tinted action so it reads as the obvious next step */
+.btn-share {
+  background: var(--brand-soft);
+  border-color: rgba(189, 104, 57, 0.28);
+  color: var(--brand-deep);
+}
+.btn-share:hover {
+  background: var(--brand-soft);
+  border-color: rgba(189, 104, 57, 0.5);
+}
+.btn-share svg {
+  color: var(--brand-deep);
+}
 
 /* ---------- Segmented control ---------- */
 .segmented {
@@ -2423,3 +2436,11 @@ button {
 
 /* share panel */
 .share-panel { padding: 16px 18px; margin-top: 4px; max-width: 360px; }
+
+/* invite link row */
+.invite-link-row { display: flex; gap: 8px; }
+.invite-link-row .input {
+  flex: 1; min-width: 0; font-size: 12.5px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.invite-link-row .btn { flex: none; }

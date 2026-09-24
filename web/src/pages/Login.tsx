@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api";
 import { useAuth } from "../lib/auth";
 import { IconAsk, IconCamera, IconInfo, IconLeaf } from "../components/icons";
+import { PENDING_INVITE_KEY } from "./Invite";
 
 type Mode = "login" | "signup";
 
@@ -77,7 +78,14 @@ export function Login() {
       else await signIn(mail, password);
       // Remember the email for next time now that it's known-good.
       saveLastEmail(mail);
-      navigate("/", { replace: true });
+      // If they arrived via an invite link, redeem it now that they're signed in.
+      let pending: string | null = null;
+      try {
+        pending = localStorage.getItem(PENDING_INVITE_KEY);
+      } catch {
+        /* storage disabled */
+      }
+      navigate(pending ? `/invite/${pending}` : "/", { replace: true });
     } catch (err) {
       setError(friendlyError(err, isSignup));
     } finally {

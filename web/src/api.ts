@@ -793,4 +793,18 @@ export const api = {
 
   /** My home feed — meals shared by people I follow (and my own). */
   getFeed: () => request<FeedItem[]>("/feed"),
+
+  /** A shareable invite-link token — a friend redeems it to connect with me. */
+  getInviteToken: () => request<{ token: string }>("/invite/token"),
+
+  /** Redeem an invite link — connects me and the inviter (they follow each other). */
+  acceptInvite: (token: string) =>
+    request<{ ok: boolean; self: boolean; display_name: string | null }>(
+      "/invite/accept",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      },
+    ),
 };

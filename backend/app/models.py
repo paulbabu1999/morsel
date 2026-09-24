@@ -207,6 +207,10 @@ class ShareRequest(BaseModel):
     note: Optional[str] = None
 
 
+class InviteAcceptRequest(BaseModel):
+    token: str  # a shareable invite token; redeeming it connects the two users
+
+
 class RefineRequest(BaseModel):
     """Apply a plain-language correction to a draft's items (re-estimate calories)."""
 
