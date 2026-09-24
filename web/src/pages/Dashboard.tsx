@@ -97,7 +97,7 @@ function InsightsCard({
             <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>
               {i.title}
             </div>
-            <div style={{ fontSize: 13.5, color: "#98a2b3", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
               {i.detail}
             </div>
           </div>
@@ -152,24 +152,25 @@ export function Dashboard() {
  *  gap — no streak that "breaks". */
 function ConsistencyStrip({ days }: { days: number }) {
   const n = Math.min(Math.max(days, 0), 7);
+  const msg =
+    n === 0
+      ? "A fresh week — one meal starts the habit"
+      : n <= 2
+        ? `Logged ${n} of the last 7 days — every day counts`
+        : n <= 5
+          ? `Logged ${n} of the last 7 days — you're building a real habit`
+          : `Logged ${n} of the last 7 days — incredible consistency`;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-      <div style={{ display: "flex", gap: 5 }}>
+    <div className="streak">
+      <span className="streak-icon">
+        <IconFlame />
+      </span>
+      <div className="streak-dots" aria-hidden>
         {Array.from({ length: 7 }).map((_, i) => (
-          <span
-            key={i}
-            style={{
-              width: 9,
-              height: 9,
-              borderRadius: "50%",
-              background: i < n ? "var(--brand)" : "var(--surface-3)",
-            }}
-          />
+          <span key={i} className={`streak-dot${i < n ? " on" : ""}`} />
         ))}
       </div>
-      <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
-        {n === 0 ? "A fresh week — log a meal to get going" : `Logged ${n} of the last 7 days`}
-      </span>
+      <span className="streak-text">{msg}</span>
     </div>
   );
 }
@@ -242,8 +243,8 @@ function DashboardBody({
 
           <section className="card card-pad">
             <div className="card-head">
-              <div className="card-title">Macros / day</div>
-              <div className="card-hint">avg vs target, {rangeLabel}</div>
+              <div className="card-title">Macros</div>
+              <div className="card-hint">avg / day vs target, {rangeLabel}</div>
             </div>
             <div className="adq-list">
               {proteinAdq ? (
@@ -338,14 +339,14 @@ function DashboardBody({
           value={formatNumber(stats.total_calories)}
           unit="kcal"
           foot={`across ${stats.total_meals} meals ${rangeLabel}`}
-          accent="#ff8a4c"
+          accent="#e8894f"
           icon={<IconFlame />}
         />
         <Kpi
           label="Avg calories / day"
           value={formatNumber(stats.avg_calories_per_day)}
           unit="kcal"
-          accent="#ff5e7e"
+          accent="#e0857a"
           icon={<IconBolt />}
         />
         <Kpi
@@ -388,8 +389,8 @@ function DashboardBody({
               >
                 <defs>
                   <linearGradient id="calGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ff9a5a" />
-                    <stop offset="100%" stopColor="#ff5e7e" />
+                    <stop offset="0%" stopColor="#f2ad7c" />
+                    <stop offset="100%" stopColor="#e07a52" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid vertical={false} stroke="var(--grid)" />

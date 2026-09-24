@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api";
 import { useAuth } from "../lib/auth";
-import { IconInfo } from "../components/icons";
+import { IconAsk, IconCamera, IconInfo, IconLeaf } from "../components/icons";
 
 type Mode = "login" | "signup";
 
@@ -94,7 +94,44 @@ export function Login() {
 
   return (
     <div className="auth-screen">
-      <div className="auth-card">
+      <div className="auth-layout">
+        <aside className="auth-hero">
+          <div className="auth-hero-brand">
+            <div className="brand-mark">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="7.5" stroke="#1a0f08" strokeWidth="2.4" />
+                <circle cx="12" cy="12" r="2.4" fill="#1a0f08" />
+              </svg>
+            </div>
+            <span className="brand-name">Bite</span>
+          </div>
+          <h2 className="auth-hero-title">Eat well, gently.</h2>
+          <p className="auth-hero-lead">
+            Snap a photo of your meal — Bite reads it, fills in real nutrition,
+            and keeps a calm, private record you can actually keep up with.
+          </p>
+          <ul className="auth-hero-points">
+            <li>
+              <span className="ahp-icon">
+                <IconCamera />
+              </span>
+              Photo → instant calories &amp; macros
+            </li>
+            <li>
+              <span className="ahp-icon">
+                <IconAsk />
+              </span>
+              Ask your food history in plain English
+            </li>
+            <li>
+              <span className="ahp-icon">
+                <IconLeaf />
+              </span>
+              A gentle daily goal, never a crash diet
+            </li>
+          </ul>
+        </aside>
+        <div className="auth-card">
         <div className="brand auth-brand">
           <div className="brand-mark">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -180,6 +217,7 @@ export function Login() {
           <button type="button" className="auth-link" onClick={toggleMode}>
             {isSignup ? "Log in" : "Create one"}
           </button>
+        </div>
         </div>
       </div>
     </div>

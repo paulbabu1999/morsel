@@ -356,18 +356,17 @@ export function Capture() {
       <div className="stub-note" style={{ marginBottom: 22 }}>
         <IconInfo />
         <div>
-          <b>Two-step capture.</b> Your photos + note are analyzed into an editable draft,
-          then each item is resolved to real USDA nutrition. Cooking something like overnight
-          oats? Add the finished dish <i>and</i> a few ingredient photos — it treats them as one
-          meal and sums the parts. Edit anything before saving.
+          <b>Snap it, or say it.</b> Photograph the dish — add ingredient photos for
+          something cooked — or just type a note. Bite drafts the nutrition and you edit
+          anything before it saves.
         </div>
       </div>
 
       <div className="grid two-col">
         {/* Left column — quick log (free text) above the photo/analyze form */}
         <div className="grid" style={{ gap: 18, alignContent: "start" }}>
-          {/* Quick log — type several meals at once */}
-          <form className="card card-pad" onSubmit={onQuickLog}>
+          {/* Quick log — type several meals at once (secondary path, shown below) */}
+          <form className="card card-pad" style={{ order: 2 }} onSubmit={onQuickLog}>
             <div className="field">
               <label className="label" htmlFor="quicklog">
                 Quick log{" "}
@@ -397,8 +396,8 @@ export function Capture() {
             </div>
           </form>
 
-          {/* Step 1 — photo/analyze capture form (single meal) */}
-          <form className="card card-pad" onSubmit={onAnalyze}>
+          {/* Step 1 — photo/analyze capture form (single meal); shown first */}
+          <form className="card card-pad" style={{ order: 1 }} onSubmit={onAnalyze}>
           <div className="grid" style={{ gap: 18 }}>
             <div className="field">
               <span className="label">

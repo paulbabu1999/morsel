@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, MobileNav } from "./components/Sidebar";
 import { Dashboard } from "./pages/Dashboard";
 import { Capture } from "./pages/Capture";
 import { History } from "./pages/History";
@@ -75,6 +75,7 @@ function AppShell() {
   return (
     <div className="app-shell">
       <Sidebar />
+      <MobileNav />
       <main className="main">
         <ScrollToTop />
         {needsOnboarding ? (
