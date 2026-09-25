@@ -40,6 +40,14 @@ _NUTRIENT_FIELDS = [
 ]
 
 
+def _clean_desc(desc: str) -> str:
+    """USDA descriptions read like 'Rice, white, cooked, glutinous' or 'Chicken,
+    broilers or fryers, breast, grilled'. Keep the first two comma segments for a
+    cleaner, less clinical display name."""
+    parts = [p.strip() for p in (desc or "").split(",") if p.strip()]
+    return ", ".join(parts[:2]) if parts else (desc or "")
+
+
 def _parse_food(food: dict, name: str) -> dict | None:
     """Map one FDC search hit to a per-100g food_entity dict (None if no energy)."""
     nutrients = {field: 0.0 for field in _NUTRIENT_FIELDS}
@@ -60,7 +68,7 @@ def _parse_food(food: dict, name: str) -> dict | None:
         return None
 
     entry = {
-        "canonical_name": (food.get("description") or name).title()[:120],
+        "canonical_name": _clean_desc(food.get("description") or name).title()[:80],
         "aliases": [name.lower()],
         "fdc_id": food.get("fdcId"),
         "source": "usda",
