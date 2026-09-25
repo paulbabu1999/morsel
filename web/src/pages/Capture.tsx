@@ -307,13 +307,72 @@ export function Capture() {
     }
   }
 
+  const phase: "form" | "working" | "quicklog" | "draft" | "saved" = saved
+    ? "saved"
+    : draft
+      ? "draft"
+      : quickDrafts
+        ? "quicklog"
+        : quickLogging
+          ? "working"
+          : "form";
+
   return (
-    <>
+    <div className="capture-flow">
       <PageHead
-        eyebrow="Log"
-        title="Capture a meal"
-        subtitle="Snap a photo and describe what you ate. Bite analyzes it into an editable draft — tweak the items, then confirm to save with full nutrition."
+        eyebrow={phase === "saved" ? "Saved" : phase === "draft" ? "Review" : "Log"}
+        title={
+          phase === "saved"
+            ? "Meal saved"
+            : phase === "draft"
+              ? "Review your meal"
+              : "Capture a meal"
+        }
+        subtitle={
+          phase === "saved"
+            ? "It's in your history with full nutrition."
+            : phase === "draft"
+              ? "Bite analyzed this into an editable draft — tweak anything, then save."
+              : "Snap a photo or jot a note. Bite drafts the nutrition; you edit before it saves."
+        }
       />
+
+      {phase === "saved" && saved && <SavedMeal meal={saved} onLogAnother={reset} />}
+
+      {phase === "quicklog" && quickDrafts && (
+        <QuickLogReview initialDrafts={quickDrafts} source={source} onReset={resetQuickLog} />
+      )}
+
+      {phase === "working" && (
+        <div className="card card-pad" style={{ display: "grid", placeItems: "center", minHeight: 220 }}>
+          <Loading label="Reading your quick log…" />
+        </div>
+      )}
+
+      {phase === "draft" && draft && (
+        <DraftEditor
+          draft={draft}
+          source={source}
+          note={note}
+          eatenAt={eatenAt}
+          onSaved={setSaved}
+          onRefined={setDraft}
+          onStartOver={reset}
+        />
+      )}
+
+      {phase === "form" && (
+        <>
+          {error && (
+            <div style={{ marginBottom: 16 }}>
+              <ErrorState message={error} />
+            </div>
+          )}
+          {quickError && (
+            <div style={{ marginBottom: 16 }}>
+              <ErrorState message={quickError} onRetry={() => runQuickLog(quickText)} />
+            </div>
+          )}
 
       {suggestions.length > 0 && (
         <div className="logagain">
@@ -362,42 +421,8 @@ export function Capture() {
         </div>
       </div>
 
-      <div className="grid two-col">
-        {/* Left column — quick log (free text) above the photo/analyze form */}
-        <div className="grid" style={{ gap: 18, alignContent: "start" }}>
-          {/* Quick log — type several meals at once (secondary path, shown below) */}
-          <form className="card card-pad" style={{ order: 2 }} onSubmit={onQuickLog}>
-            <div className="field">
-              <label className="label" htmlFor="quicklog">
-                Quick log{" "}
-                <span className="opt">· type everything you ate in one go</span>
-              </label>
-              <textarea
-                id="quicklog"
-                className="textarea"
-                value={quickText}
-                onChange={(e) => setQuickText(e.target.value)}
-                onFocus={() => warmup()}
-                placeholder="Type everything you ate — 'oatmeal and coffee for breakfast, a chicken burrito at Chipotle for lunch, an apple'"
-              />
-            </div>
-            <div className="card-hint" style={{ margin: "10px 0 0" }}>
-              We'll split it into separate meals you can review before saving.
-            </div>
-            <div style={{ display: "flex", marginTop: 14 }}>
-              <button
-                className="btn btn-primary"
-                type="submit"
-                disabled={quickLogging || !quickText.trim()}
-              >
-                <IconSpark />
-                {quickLogging ? "Reading…" : "Quick log"}
-              </button>
-            </div>
-          </form>
-
-          {/* Step 1 — photo/analyze capture form (single meal); shown first */}
-          <form className="card card-pad" style={{ order: 1 }} onSubmit={onAnalyze}>
+          {/* Primary: photo + note capture form */}
+          <form className="card card-pad" onSubmit={onAnalyze}>
           <div className="grid" style={{ gap: 18 }}>
             <div className="field">
               <span className="label">
@@ -587,60 +612,35 @@ export function Capture() {
             </div>
           </div>
         </form>
-        </div>
 
-        {/* Step 2 — quick-log review takes over the column, else the photo draft */}
-        <div>
-          {quickLogging ? (
-            <div
-              className="card card-pad"
-              style={{ height: "100%", display: "grid", placeItems: "center" }}
-            >
-              <Loading label="Reading your quick log…" />
+          {/* Secondary: quick-log a whole day at once */}
+          <form className="card card-pad" style={{ marginTop: 18 }} onSubmit={onQuickLog}>
+            <div className="field">
+              <label className="label" htmlFor="quicklog">
+                Or quick-log <span className="opt">· type a whole day in one go</span>
+              </label>
+              <textarea
+                id="quicklog"
+                className="textarea"
+                value={quickText}
+                onChange={(e) => setQuickText(e.target.value)}
+                onFocus={() => warmup()}
+                placeholder="oatmeal and coffee for breakfast, a chicken burrito at Chipotle for lunch, an apple"
+              />
             </div>
-          ) : quickError ? (
-            <ErrorState message={quickError} onRetry={() => runQuickLog(quickText)} />
-          ) : quickDrafts ? (
-            <QuickLogReview
-              initialDrafts={quickDrafts}
-              source={source}
-              onReset={resetQuickLog}
-            />
-          ) : (
-            <>
-              {error && <ErrorState message={error} />}
-              {!error && saved && <SavedMeal meal={saved} onLogAnother={reset} />}
-              {!error && !saved && draft && (
-                <DraftEditor
-                  draft={draft}
-                  source={source}
-                  eatenAt={eatenAt}
-                  onSaved={setSaved}
-                  onRefined={setDraft}
-                />
-              )}
-              {!error && !saved && !draft && (
-                <div className="card card-pad" style={{ height: "100%" }}>
-                  <div
-                    className="state"
-                    style={{ padding: "40px 12px", height: "100%", justifyContent: "center" }}
-                  >
-                    <div className="state-icon">
-                      <IconSpark />
-                    </div>
-                    <div className="state-title">Your editable draft appears here</div>
-                    <div className="state-msg">
-                      Add a note (and optionally a photo), then hit “Analyze”. You'll get a
-                      resolved item list you can edit before saving.
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </>
+            <div className="card-hint" style={{ margin: "10px 0 0" }}>
+              We'll split it into separate meals you can review before saving.
+            </div>
+            <div style={{ display: "flex", marginTop: 14 }}>
+              <button className="btn btn-ghost" type="submit" disabled={quickLogging || !quickText.trim()}>
+                <IconSpark />
+                {quickLogging ? "Reading…" : "Quick log"}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -825,16 +825,21 @@ function QuickLogReview({
 function DraftEditor({
   draft: initialDraft,
   source,
-  eatenAt,
+  note: initialNote,
+  eatenAt: initialEatenAt,
   onSaved,
   onRefined,
+  onStartOver,
 }: {
   draft: CaptureDraft;
   source: CaptureSource;
+  note: string;
   eatenAt: string;
   onSaved: (m: Meal) => void;
   /** Lift a refined draft up so the parent can re-render totals + persist it. */
   onRefined?: (d: CaptureDraft) => void;
+  /** Discard the draft and return to the capture form. */
+  onStartOver: () => void;
 }) {
   // The working draft: seeded from the prop, then replaced in place by a
   // natural-language refine. Totals/tags/notes below read from this copy.
@@ -842,6 +847,8 @@ function DraftEditor({
   const [items, setItems] = useState<EditItem[]>(() => toEditItems(initialDraft));
   const [mealType, setMealType] = useState<MealType>(initialDraft.meal_type);
   const [location, setLocation] = useState(initialDraft.location ?? "");
+  const [note, setNote] = useState(initialDraft.note ?? initialNote ?? "");
+  const [eatenAt, setEatenAt] = useState(initialEatenAt);
   const [saving, setSaving] = useState(false);
   const [refining, setRefining] = useState(false);
   const [correction, setCorrection] = useState("");
@@ -916,7 +923,7 @@ function DraftEditor({
         correction: text,
         meal_type: mealType,
         location: location.trim() || null,
-        note: draft.note ?? null,
+        note: note.trim() || null,
         source,
         photo_uris: draft.photo_uris,
       });
@@ -941,7 +948,7 @@ function DraftEditor({
       meal_type: mealType,
       items: cleaned,
       location: location.trim() || null,
-      note: draft.note ?? null,
+      note: note.trim() || null,
       source,
       photo_uri: draft.photo_uri,
       photo_uris: draft.photo_uris,
@@ -988,33 +995,6 @@ function DraftEditor({
         fat={draft.total_fat_g}
         hint="Estimated from analysis — recomputed from your edits on save."
       />
-
-      {/* Meal meta */}
-      <div className="form-row" style={{ marginBottom: 16 }}>
-        <div className="field">
-          <label className="label">Meal type</label>
-          <select
-            className="select"
-            value={mealType}
-            onChange={(e) => setMealType(e.target.value as MealType)}
-          >
-            {MEAL_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {titleCase(t)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label className="label">Location</label>
-          <input
-            className="input"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Home, Chipotle…"
-          />
-        </div>
-      </div>
 
       {/* Editable items — one soft card each; fields wrap instead of forming a
           cramped, horizontally-scrolling table. */}
@@ -1102,6 +1082,60 @@ function DraftEditor({
         </button>
       </div>
 
+      {/* Details — meal type, time, place, note (secondary to the items above) */}
+      <div className="draft-details">
+        <div className="draft-details-label">Details</div>
+        <div className="form-row">
+          <div className="field">
+            <label className="label">Meal type</label>
+            <select
+              className="select"
+              value={mealType}
+              onChange={(e) => setMealType(e.target.value as MealType)}
+            >
+              {MEAL_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {titleCase(t)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label className="label">When</label>
+            <input
+              className="input"
+              type="datetime-local"
+              value={eatenAt}
+              max={toLocalInputValue(new Date())}
+              onChange={(e) => setEatenAt(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="field" style={{ marginTop: 12 }}>
+          <label className="label">
+            Location <span className="opt">· optional</span>
+          </label>
+          <input
+            className="input"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Home, Chipotle…"
+          />
+        </div>
+        <div className="field" style={{ marginTop: 12 }}>
+          <label className="label">
+            Note <span className="opt">· optional</span>
+          </label>
+          <textarea
+            className="textarea"
+            style={{ minHeight: 58 }}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="anything to remember about this meal"
+          />
+        </div>
+      </div>
+
       {draft.tags.length > 0 && (
         <div className="tags" style={{ marginTop: 16 }}>
           {draft.tags.map((t) => (
@@ -1140,6 +1174,9 @@ function DraftEditor({
         <button className="btn btn-primary" onClick={save} disabled={saving}>
           <IconCheck />
           {saving ? "Saving…" : "Confirm & save meal"}
+        </button>
+        <button className="btn btn-ghost" onClick={onStartOver} disabled={saving}>
+          Start over
         </button>
       </div>
     </div>

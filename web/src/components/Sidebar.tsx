@@ -22,11 +22,11 @@ const PRIMARY: Link[] = [
   { to: "/capture", label: "Capture", Icon: IconCamera },
   { to: "/dashboard", label: "Dashboard", Icon: IconHome },
   { to: "/history", label: "History", Icon: IconHistory },
+  { to: "/feed", label: "Feed", Icon: IconUsers },
   { to: "/ask", label: "Ask", Icon: IconAsk },
 ];
 const SECONDARY: Link[] = [
-  { to: "/feed", label: "Feed", Icon: IconUsers },
-  { to: "/friends", label: "Friends", Icon: IconUsers },
+  { to: "/friends", label: "Friends", Icon: IconUser },
   { to: "/reminders", label: "Reminders", Icon: IconBell },
   { to: "/profile", label: "Profile", Icon: IconUser },
 ];

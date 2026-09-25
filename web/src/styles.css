@@ -1918,6 +1918,25 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Capture is a focused, single-column flow: form → draft → saved */
+.capture-flow {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.draft-details {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.draft-details-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
 /* micro strip / grid */
 .micro-strip {
   display: flex;

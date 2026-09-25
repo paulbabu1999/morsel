@@ -89,20 +89,23 @@ export function Ask() {
           </div>
         )}
 
-        {/* Route legend — tells the "which retrieval path" story up-front. */}
-        <div className="route-legend">
-          {ROUTES.map((r) => (
-            <div className="route-legend-item" key={r} style={routeVars(r)}>
-              <span className="rl-dot" style={{ background: `var(--route-${r})` }} />
-              <div>
-                <div className="rl-name" style={{ color: `var(--route-${r})` }}>
-                  {ROUTE_META[r].label}
+        {/* Route legend — the up-front explainer; hidden once you've asked so the
+            answer sits right under the search box. */}
+        {!result && !loading && (
+          <div className="route-legend">
+            {ROUTES.map((r) => (
+              <div className="route-legend-item" key={r} style={routeVars(r)}>
+                <span className="rl-dot" style={{ background: `var(--route-${r})` }} />
+                <div>
+                  <div className="rl-name" style={{ color: `var(--route-${r})` }}>
+                    {ROUTE_META[r].label}
+                  </div>
+                  <div className="rl-desc">{ROUTE_META[r].engine}</div>
                 </div>
-                <div className="rl-desc">{ROUTE_META[r].engine}</div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="section-gap">
