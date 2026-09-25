@@ -374,44 +374,6 @@ export function Capture() {
             </div>
           )}
 
-      {suggestions.length > 0 && (
-        <div className="logagain">
-          <div className="logagain-label">
-            <IconClock width={13} height={13} />
-            Log again
-          </div>
-          <div className="logagain-chips">
-            {suggestions.map((m) => {
-              const state = relogState[m.id];
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  className="logagain-chip"
-                  onClick={() => relogSuggestion(m)}
-                  disabled={state === "saving" || state === "done"}
-                  title={`Log again: ${m.description}`}
-                >
-                  <span className="logagain-chip-name">{m.description}</span>
-                  {state === "done" ? (
-                    <span className="logagain-chip-done">
-                      <IconCheck width={13} height={13} />
-                      Logged
-                    </span>
-                  ) : (
-                    <span className="logagain-chip-cal">
-                      {state === "saving"
-                        ? "Logging…"
-                        : `${formatNumber(m.total_calories)} kcal`}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       <div className="stub-note" style={{ marginBottom: 22 }}>
         <IconInfo />
         <div>
@@ -514,6 +476,13 @@ export function Capture() {
                     <IconImage width={17} height={17} />
                     Choose from library
                   </button>
+                  {suggestions.length > 0 && (
+                    <LogAgainMenu
+                      suggestions={suggestions}
+                      relogState={relogState}
+                      onRelog={relogSuggestion}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -639,6 +608,86 @@ export function Capture() {
             </div>
           </form>
         </>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- "Log again" dropdown (re-log a recent meal) ---------------- */
+function LogAgainMenu({
+  suggestions,
+  relogState,
+  onRelog,
+}: {
+  suggestions: Meal[];
+  relogState: Record<string, "saving" | "done">;
+  onRelog: (m: Meal) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div className="logagain-menu" ref={ref}>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <IconClock width={16} height={16} />
+        Log again
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div className="logagain-dropdown" role="menu">
+          <div className="logagain-dropdown-label">Re-log a recent meal</div>
+          {suggestions.map((m) => {
+            const state = relogState[m.id];
+            return (
+              <button
+                key={m.id}
+                type="button"
+                className="logagain-item"
+                role="menuitem"
+                onClick={() => onRelog(m)}
+                disabled={state === "saving" || state === "done"}
+              >
+                <span className="logagain-item-name">{m.description}</span>
+                {state === "done" ? (
+                  <span className="logagain-item-done">
+                    <IconCheck width={13} height={13} /> Logged
+                  </span>
+                ) : (
+                  <span className="logagain-item-cal">
+                    {state === "saving" ? "Logging…" : `${formatNumber(m.total_calories)} kcal`}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );

@@ -1937,6 +1937,77 @@ button {
   margin-bottom: 12px;
 }
 
+/* "Log again" dropdown — a compact re-log menu beside the photo actions */
+.logagain-menu {
+  position: relative;
+  display: inline-flex;
+}
+.logagain-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 280px;
+  max-width: min(360px, 82vw);
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+}
+.logagain-dropdown-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 6px 10px 8px;
+}
+.logagain-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--text);
+  transition: background 0.12s;
+}
+.logagain-item:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.logagain-item:disabled {
+  cursor: default;
+}
+.logagain-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.logagain-item-cal {
+  flex: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.logagain-item-done {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--good);
+  font-weight: 700;
+}
+
 /* micro strip / grid */
 .micro-strip {
   display: flex;
