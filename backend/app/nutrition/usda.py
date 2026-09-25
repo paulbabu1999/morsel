@@ -71,12 +71,39 @@ def _parse_food(food: dict, name: str) -> dict | None:
     return entry
 
 
+_STOPWORDS = {"a", "an", "the", "of", "with", "and", "in", "on", "raw", "fresh"}
+
+
+def _tokens(text: str) -> set[str]:
+    import re
+
+    return {
+        w for w in re.split(r"[^a-z0-9]+", (text or "").lower())
+        if len(w) > 2 and w not in _STOPWORDS
+    }
+
+
+def _relevance(query_tokens: set[str], description: str) -> float:
+    """Score how well an FDC hit matches the query. Rewards shared words and
+    penalizes long, over-specific descriptions (e.g. a branded 'Milk Coffee
+    Organic Ice Cream' should lose to 'Coffee, brewed' for the query 'iced
+    coffee'). Negative/zero => not a real match."""
+    desc_tokens = _tokens(description)
+    if not query_tokens or not desc_tokens:
+        return 0.0
+    overlap = len(query_tokens & desc_tokens)
+    if overlap == 0:
+        return 0.0
+    extra = len(desc_tokens - query_tokens)  # words in the hit not asked for
+    return overlap - 0.18 * extra
+
+
 def _query(name: str, data_types: list[str], timeout: float) -> dict | None:
     params = {
         "api_key": config.USDA_API_KEY,
         "query": name,
         "dataType": data_types,
-        "pageSize": 5,  # scan a few and skip 0-kcal junk matches
+        "pageSize": 15,  # scan more, then pick the most RELEVANT (not just first non-zero)
     }
     try:
         resp = httpx.get(f"{config.USDA_BASE_URL}/foods/search", params=params, timeout=timeout)
@@ -84,11 +111,20 @@ def _query(name: str, data_types: list[str], timeout: float) -> dict | None:
         data = resp.json()
     except Exception:
         return None
+    qt = _tokens(name)
+    best: dict | None = None
+    best_score = 0.0
     for food in (data.get("foods") or []):
         entry = _parse_food(food, name)
-        if entry:
-            return entry
-    return None
+        if not entry:  # 0-kcal / junk
+            continue
+        score = _relevance(qt, food.get("description") or "")
+        if score > best_score:
+            best_score, best = score, entry
+    # Require at least one shared, meaningful word — otherwise it's a spurious
+    # match (let the caller fall through to Open Food Facts / the LLM estimate,
+    # which keeps the food's real name instead of an unrelated product).
+    return best if best_score > 0 else None
 
 
 def search_food(name: str, timeout: float = 8.0) -> dict | None:

@@ -981,15 +981,13 @@ function DraftEditor({
       </div>
 
       {/* Estimated totals from analysis */}
-      <div className="draft-totals">
-        <Estimate label="Calories" value={formatNumber(draft.total_calories)} unit="kcal" />
-        <Estimate label="Protein" value={formatNumber(draft.total_protein_g, 1)} unit="g" />
-        <Estimate label="Carbs" value={formatNumber(draft.total_carbs_g, 1)} unit="g" />
-        <Estimate label="Fat" value={formatNumber(draft.total_fat_g, 1)} unit="g" />
-      </div>
-      <div className="card-hint" style={{ marginBottom: 16 }}>
-        Estimated from analysis — nutrition is recomputed from your edits on save.
-      </div>
+      <MealTotals
+        calories={draft.total_calories}
+        protein={draft.total_protein_g}
+        carbs={draft.total_carbs_g}
+        fat={draft.total_fat_g}
+        hint="Estimated from analysis — recomputed from your edits on save."
+      />
 
       {/* Meal meta */}
       <div className="form-row" style={{ marginBottom: 16 }}>
@@ -1018,48 +1016,56 @@ function DraftEditor({
         </div>
       </div>
 
-      {/* Editable items */}
-      <div className="item-editor">
-        <div className="item-editor-head">
-          <span>Item</span>
-          <span>Qty</span>
-          <span>Unit</span>
-          <span />
-        </div>
+      {/* Editable items — one soft card each; fields wrap instead of forming a
+          cramped, horizontally-scrolling table. */}
+      <div className="draft-items">
         {items.map((it) => (
-          <div className="item-row" key={it.key}>
-            <input
-              className="input"
-              value={it.name}
-              onChange={(e) => changeName(it.key, e.target.value)}
-              placeholder="e.g. chicken burrito"
-              aria-label="Item name"
-            />
-            <input
-              className="input"
-              type="number"
-              min={0}
-              step="0.25"
-              value={it.quantity}
-              onChange={(e) => changeQuantity(it.key, e.target.value)}
-              aria-label="Quantity"
-            />
-            <input
-              className="input"
-              value={it.unit}
-              onChange={(e) => updateItem(it.key, { unit: e.target.value })}
-              placeholder="unit"
-              aria-label="Unit"
-            />
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => removeItem(it.key)}
-              aria-label="Remove item"
-              title="Remove item"
-            >
-              <IconTrash width={16} height={16} />
-            </button>
+          <div className="draft-item" key={it.key}>
+            <div className="draft-item-top">
+              <input
+                className="input draft-item-name"
+                value={it.name}
+                onChange={(e) => changeName(it.key, e.target.value)}
+                placeholder="e.g. chicken burrito"
+                aria-label="Item name"
+              />
+              <button
+                type="button"
+                className="draft-item-del"
+                onClick={() => removeItem(it.key)}
+                aria-label="Remove item"
+                title="Remove item"
+              >
+                <IconTrash width={15} height={15} />
+              </button>
+            </div>
+            <div className="draft-item-fields">
+              <label className="mini-field">
+                <span>Qty</span>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step="0.25"
+                  value={it.quantity}
+                  onChange={(e) => changeQuantity(it.key, e.target.value)}
+                  aria-label="Quantity"
+                />
+              </label>
+              <label className="mini-field">
+                <span>Unit</span>
+                <input
+                  className="input"
+                  value={it.unit}
+                  onChange={(e) => updateItem(it.key, { unit: e.target.value })}
+                  placeholder="serving"
+                  aria-label="Unit"
+                />
+              </label>
+              {it.calories != null && (
+                <span className="draft-item-cal">{formatNumber(it.calories)} kcal</span>
+              )}
+            </div>
           </div>
         ))}
         <button type="button" className="btn btn-ghost add-item" onClick={addItem}>
@@ -1173,14 +1179,33 @@ function ConfidenceChip({ value }: { value: number }) {
   );
 }
 
-function Estimate({ label, value, unit }: { label: string; value: string; unit: string }) {
+/** A clean totals hero: calories big, macros as soft chips. Shared by the draft
+ *  editor and the saved-meal result so both read the same way. */
+function MealTotals({
+  calories,
+  protein,
+  carbs,
+  fat,
+  hint,
+}: {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  hint?: string;
+}) {
   return (
-    <div className="estimate">
-      <div className="estimate-val">
-        {value}
-        <span className="estimate-unit"> {unit}</span>
+    <div className="meal-totals">
+      <div className="meal-totals-cal">
+        <span className="meal-totals-num">{formatNumber(calories)}</span>
+        <span className="meal-totals-unit">kcal</span>
       </div>
-      <div className="estimate-lbl">{label}</div>
+      <div className="meal-totals-macros">
+        <span className="mt-chip mt-p">{formatNumber(protein, 1)}g protein</span>
+        <span className="mt-chip mt-c">{formatNumber(carbs, 1)}g carbs</span>
+        <span className="mt-chip mt-f">{formatNumber(fat, 1)}g fat</span>
+      </div>
+      {hint && <div className="meal-totals-hint">{hint}</div>}
     </div>
   );
 }
@@ -1206,43 +1231,32 @@ function SavedMeal({ meal, onLogAnother }: { meal: Meal; onLogAnother: () => voi
         alt={meal.description}
       />
 
-      <div style={{ overflowX: "auto" }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th className="num">Cal</th>
-              <th className="num">P</th>
-              <th className="num">C</th>
-              <th className="num">F</th>
-            </tr>
-          </thead>
-          <tbody>
-            {meal.items.map((it) => (
-              <tr key={it.id}>
-                <td>
-                  <div className="food-name">{it.canonical_name}</div>
-                  <div className="food-raw">
-                    {formatNumber(it.quantity, 2)} {it.unit ?? ""}
-                  </div>
-                </td>
-                <td className="num">{formatNumber(it.calories)}</td>
-                <td className="num">{formatNumber(it.protein_g, 1)}</td>
-                <td className="num">{formatNumber(it.carbs_g, 1)}</td>
-                <td className="num">{formatNumber(it.fat_g, 1)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              <td className="num">{formatNumber(meal.total_calories)}</td>
-              <td className="num">{formatNumber(meal.total_protein_g, 1)}</td>
-              <td className="num">{formatNumber(meal.total_carbs_g, 1)}</td>
-              <td className="num">{formatNumber(meal.total_fat_g, 1)}</td>
-            </tr>
-          </tfoot>
-        </table>
+      <MealTotals
+        calories={meal.total_calories}
+        protein={meal.total_protein_g}
+        carbs={meal.total_carbs_g}
+        fat={meal.total_fat_g}
+      />
+
+      <div className="result-items">
+        {meal.items.map((it) => (
+          <div className="result-item" key={it.id}>
+            <div className="result-item-head">
+              <span className="result-item-name">{it.canonical_name}</span>
+              <span className="result-item-cal">{formatNumber(it.calories)} kcal</span>
+            </div>
+            <div className="result-item-meta">
+              <span className="result-item-qty">
+                {formatNumber(it.quantity, 2)} {it.unit ?? ""}
+              </span>
+              <span className="result-item-macros">
+                <span>P {formatNumber(it.protein_g, 1)}</span>
+                <span>C {formatNumber(it.carbs_g, 1)}</span>
+                <span>F {formatNumber(it.fat_g, 1)}</span>
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="micro-strip">
