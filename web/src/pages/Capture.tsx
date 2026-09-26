@@ -178,6 +178,22 @@ export function Capture() {
   useEffect(() => {
     if (saved) clearPersistedCapture();
   }, [saved]);
+
+  // Revoke any outstanding preview object URLs on unmount, so navigating away
+  // from Capture with photos still selected doesn't leak blobs for the tab's
+  // lifetime. A ref mirrors the latest previews so the unmount cleanup (which
+  // runs once, with the mount-time closure) sees the current list.
+  const previewsRef = useRef<string[]>([]);
+  useEffect(() => {
+    previewsRef.current = previews;
+  }, [previews]);
+  useEffect(
+    () => () => {
+      previewsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    },
+    [],
+  );
+
   // Camera (capture="environment" = rear camera on phones) vs. library (plain,
   // multi-select) pickers; both append to the photo list.
   const cameraRef = useRef<HTMLInputElement>(null);
