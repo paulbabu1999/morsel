@@ -454,9 +454,10 @@ function MealEditor({
       source: meal.source,
       photo_uri: meal.photo_uri,
       photo_uris: meal.photo_uris,
-      // datetime-local is local wall-clock; send UTC so the server stores it in
-      // the same frame as server-generated times (see _normalize_eaten_at).
-      eaten_at: eatenAt ? new Date(eatenAt).toISOString() : null,
+      // Send the datetime-local value as-is (naive wall-clock). The app renders
+      // naive meal times as local and the server default (now()) is naive too, so
+      // converting to a UTC "Z" here would shift the stored time by the tz offset.
+      eaten_at: eatenAt || null,
       description: null, // re-derived server-side from the edited items
       tags: meal.tags,
     };
