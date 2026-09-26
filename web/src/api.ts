@@ -674,6 +674,20 @@ export const api = {
       body: JSON.stringify(bodies),
     }),
 
+  /** Edit a saved meal in place: re-resolves nutrition for the (possibly changed) items. */
+  updateMeal: (id: string, body: MealCreate) =>
+    request<Meal>(`/meals/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  /** Permanently delete a saved meal. */
+  deleteMeal: (id: string) =>
+    request<{ ok: true }>(`/meals/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+
   /**
    * Re-estimate the current (edited) draft from a plain-language correction —
    * e.g. "the dal is cooked, ~200 cal" or "only 2 rotis". Returns a fresh

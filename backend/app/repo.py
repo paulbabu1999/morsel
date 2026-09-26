@@ -79,6 +79,61 @@ def persist_meal(meal: dict, user_id: str = config.DEFAULT_USER_ID) -> dict:
     return get_meal(meal["id"], user_id)
 
 
+# Meal columns updated in place on an edit (everything except id/user_id/created_at).
+_MEAL_UPDATE_COLS = [
+    "eaten_at", "meal_type", "location_text", "photo_uri", "photo_uris", "note_text",
+    "description", "tags", "source", "confidence",
+    "total_calories", "total_protein_g", "total_carbs_g", "total_fat_g",
+    "total_fiber_g", "total_sugar_g", "total_sodium_mg", "total_satfat_g",
+    "total_iron_mg", "total_calcium_mg", "total_potassium_mg",
+]
+
+
+def update_meal(meal_id: str, meal: dict, user_id: str = config.DEFAULT_USER_ID) -> dict | None:
+    """Replace a meal's fields + items in place (keeping its id), re-embedding the
+    (possibly edited) description. Returns the updated meal, or None if it doesn't
+    exist / isn't the caller's (RLS). Embedding computed before the tx (see persist_meal)."""
+    emb = _vec_literal(meal["description"])
+    with db.app_tx(user_id) as cur:
+        cur.execute("SELECT 1 FROM meals WHERE id = %s", (meal_id,))
+        if not cur.fetchone():
+            return None  # not found, or not this user's row (RLS)
+        set_clause = ", ".join(f"{c} = %s" for c in _MEAL_UPDATE_COLS) + ", embedding = %s::vector"
+        cur.execute(
+            f"UPDATE meals SET {set_clause} WHERE id = %s",
+            (
+                meal["eaten_at"], meal["meal_type"], meal.get("location_text"),
+                meal.get("photo_uri"), meal.get("photo_uris", []), meal.get("note_text"),
+                meal["description"], meal.get("tags", []), meal.get("source", "phone"),
+                meal.get("confidence", 0.9),
+                meal["total_calories"], meal["total_protein_g"], meal["total_carbs_g"], meal["total_fat_g"],
+                meal["total_fiber_g"], meal["total_sugar_g"], meal["total_sodium_mg"], meal["total_satfat_g"],
+                meal["total_iron_mg"], meal["total_calcium_mg"], meal["total_potassium_mg"],
+                emb, meal_id,
+            ),
+        )
+        cur.execute("DELETE FROM meal_items WHERE meal_id = %s", (meal_id,))
+        for it in meal["items"]:
+            cur.execute(
+                f"INSERT INTO meal_items ({', '.join(_ITEM_COLS)}) "
+                f"VALUES ({', '.join(['%s'] * len(_ITEM_COLS))})",
+                (
+                    it["id"], meal_id, user_id, it.get("food_entity_id"), it["raw_name"],
+                    it["canonical_name"], it["quantity"], it["unit"], it["grams"],
+                    *[it[n] for n in _NUTRIENTS], it.get("confidence", 0.9),
+                ),
+            )
+    return get_meal(meal_id, user_id)
+
+
+def delete_meal(meal_id: str, user_id: str = config.DEFAULT_USER_ID) -> bool:
+    """Delete a meal + its items (RLS-scoped). Returns True if a row was removed."""
+    with db.app_tx(user_id) as cur:
+        cur.execute("DELETE FROM meal_items WHERE meal_id = %s", (meal_id,))
+        cur.execute("DELETE FROM meals WHERE id = %s", (meal_id,))
+        return cur.rowcount > 0
+
+
 # --- reads ----------------------------------------------------------------
 
 def list_meals(

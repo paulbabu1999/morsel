@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Sidebar, MobileNav } from "./components/Sidebar";
+import { Welcome } from "./components/Welcome";
 import { Dashboard } from "./pages/Dashboard";
 import { Capture } from "./pages/Capture";
 import { History } from "./pages/History";
@@ -15,6 +16,7 @@ import { Login } from "./pages/Login";
 import { Invite } from "./pages/Invite";
 import { ProfileProvider, useProfile } from "./lib/profile";
 import { useAuth } from "./lib/auth";
+import { hasSeenWelcome } from "./lib/welcome";
 import { Loading } from "./components/states";
 
 /** Scroll to top on route change. */
@@ -68,8 +70,15 @@ export function App() {
 /** The authenticated app: sidebar + routed pages, with the onboarding gate. */
 function AppShell() {
   const { loaded, profile } = useProfile();
+  const { user } = useAuth();
   const { pathname } = useLocation();
   useReminderScheduler();
+
+  // First-run intro (per user, localStorage-gated). Shows as an overlay above the
+  // app before onboarding — always skippable, so it never blocks getting started.
+  const [showWelcome, setShowWelcome] = useState(() =>
+    user ? !hasSeenWelcome(user.user_id) : false,
+  );
 
   // Onboarding gate: once the profile has loaded and is null, route the user
   // to the Profile page to set it up. Saving updates the shared context, which
@@ -81,6 +90,9 @@ function AppShell() {
 
   return (
     <div className="app-shell">
+      {showWelcome && user && (
+        <Welcome uid={user.user_id} onDone={() => setShowWelcome(false)} />
+      )}
       <Sidebar />
       <MobileNav />
       <main className="main">

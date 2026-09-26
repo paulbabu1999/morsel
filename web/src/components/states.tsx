@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { IconAlert, IconInfo } from "./icons";
 
@@ -5,11 +6,62 @@ export function Spinner() {
   return <div className="spinner" role="status" aria-label="Loading" />;
 }
 
-export function Loading({ label = "Loading…" }: { label?: string }) {
+export function Loading({
+  label = "Loading…",
+  coldStartHint = true,
+}: {
+  label?: string;
+  /** After a few seconds, reassure that a slow response is the free server
+   *  waking from sleep (Render/Neon cold start), not a hang. On by default. */
+  coldStartHint?: boolean;
+}) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!coldStartHint) return;
+    const t = setTimeout(() => setSlow(true), 4500);
+    return () => clearTimeout(t);
+  }, [coldStartHint]);
   return (
     <div className="state">
       <Spinner />
       <div className="state-msg">{label}</div>
+      {slow && (
+        <div className="state-hint">
+          Still going — the free server may be waking from sleep. The first request
+          after a quiet spell can take up to a minute. Hang tight.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** An inline reassurance that appears only if an action runs long — for
+ *  button-driven waits (analyze, quick-log) where there's no full-page loader.
+ *  Escalates from silent → visible after `delayMs` so a fast response shows
+ *  nothing, but a cold start doesn't feel like a hang. */
+export function SlowHint({
+  active,
+  delayMs = 4500,
+  children,
+}: {
+  active: boolean;
+  delayMs?: number;
+  children: ReactNode;
+}) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setShow(false);
+      return;
+    }
+    const t = setTimeout(() => setShow(true), delayMs);
+    return () => clearTimeout(t);
+  }, [active, delayMs]);
+  if (!active || !show) return null;
+  return (
+    <div className="state-hint state-hint-inline" role="status">
+      <Spinner />
+      <span>{children}</span>
     </div>
   );
 }

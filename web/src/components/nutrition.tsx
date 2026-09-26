@@ -1,6 +1,46 @@
 import type { AdequacyStatus } from "../api";
 import { formatNumber } from "../lib/format";
 
+/* ---------- Portion size guide ---------- *
+ * The hand method: a no-tools way to eyeball servings when you don't have a
+ * photo or a scale. Shown as a subtle disclosure in the meal editor so it helps
+ * users set realistic quantities without cluttering the form. */
+const PORTION_REFS: { hand: string; ref: string; desc: string }[] = [
+  { hand: "🖐️", ref: "Palm", desc: "≈ 1 serving of protein (chicken, fish, tofu)" },
+  { hand: "✊", ref: "Fist", desc: "≈ 1 cup — veggies or a bowl of salad" },
+  { hand: "🤲", ref: "Cupped hand", desc: "≈ ½ cup cooked carbs (rice, pasta, oats)" },
+  { hand: "👍", ref: "Thumb", desc: "≈ 1 tbsp fats (oil, butter, nut butter)" },
+];
+
+export function PortionTips() {
+  return (
+    <details className="portion-tips">
+      <summary>
+        <span>📏 Not sure on quantity? Use your hand</span>
+      </summary>
+      <div className="portion-tips-body">
+        <div className="portion-grid">
+          {PORTION_REFS.map((p) => (
+            <div className="portion-item" key={p.ref}>
+              <span className="portion-hand" aria-hidden>
+                {p.hand}
+              </span>
+              <div>
+                <div className="portion-ref">{p.ref}</div>
+                <div className="portion-desc">{p.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="portion-plate">
+          <b>Plate method:</b> fill half with veggies, a quarter with protein, a
+          quarter with carbs.
+        </div>
+      </div>
+    </details>
+  );
+}
+
 /* ---------- Status colors (shared by ring + adequacy bars) ---------- */
 export const STATUS_META: Record<
   AdequacyStatus,
@@ -98,6 +138,8 @@ export function NutrientBar({
   status,
   kind,
   digits = 0,
+  hero = false,
+  hint,
 }: {
   label: string;
   amount: number;
@@ -107,11 +149,18 @@ export function NutrientBar({
   status: AdequacyStatus;
   kind: "target" | "limit";
   digits?: number;
+  /** Emphasize this nutrient as the one that matters most (protein). */
+  hero?: boolean;
+  /** A one-line "why it matters" cue shown under the bar. */
+  hint?: string;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.unknown;
   const fill = Math.min(Math.max(pct ?? 0, 0), 100);
   return (
-    <div className="adq-row" style={{ ["--adq-color" as string]: meta.color }}>
+    <div
+      className={`adq-row${hero ? " adq-row-hero" : ""}`}
+      style={{ ["--adq-color" as string]: meta.color }}
+    >
       <div className="adq-head">
         <span className="adq-label">
           {label}
@@ -140,6 +189,7 @@ export function NutrientBar({
         </span>
         <span className="adq-pct">{pct == null ? "—" : `${Math.round(pct)}%`}</span>
       </div>
+      {hint && <div className="adq-hint">{hint}</div>}
     </div>
   );
 }

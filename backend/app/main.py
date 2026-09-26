@@ -381,6 +381,26 @@ def get_meal(meal_id: str, user_id: str = CurrentUser) -> Meal:
     return Meal(**meal)
 
 
+@app.put("/meals/{meal_id}", response_model=Meal)
+def update_meal(meal_id: str, body: MealCreate, user_id: str = CurrentUser) -> Meal:
+    """Edit a saved meal: re-resolve nutrition for the (possibly changed) items and
+    replace the row in place, keeping its id. 404 if it isn't the caller's meal."""
+    if not body.items:
+        raise HTTPException(status_code=400, detail="A meal needs at least one item")
+    meal = capture_service.build_meal(body.model_dump())
+    updated = repo.update_meal(meal_id, meal, user_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    return Meal(**updated)
+
+
+@app.delete("/meals/{meal_id}")
+def delete_meal(meal_id: str, user_id: str = CurrentUser) -> dict:
+    if not repo.delete_meal(meal_id, user_id):
+        raise HTTPException(status_code=404, detail="Meal not found")
+    return {"ok": True}
+
+
 # --- query -----------------------------------------------------------------
 
 @app.post("/query", response_model=QueryResponse)

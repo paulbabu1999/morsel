@@ -11,7 +11,8 @@ import type {
 } from "../api";
 import { formatNumber, titleCase } from "../lib/format";
 import { PageHead } from "../components/ui";
-import { ErrorState, Loading } from "../components/states";
+import { ErrorState, Loading, SlowHint } from "../components/states";
+import { PortionTips } from "../components/nutrition";
 import { SourceBadge } from "../components/badges";
 import { PhotoGallery } from "../components/PhotoGallery";
 import { ShareMeal } from "../components/ShareMeal";
@@ -533,6 +534,11 @@ export function Capture() {
               </button>
             </div>
 
+            <SlowHint active={analyzing}>
+              Reading your meal… the first analysis can take up to a minute while the
+              free server wakes up. Hang tight.
+            </SlowHint>
+
             {/* Optional meta — all also editable on the draft after analyzing. */}
             <details className="capture-options">
               <summary>More options · meal type, time &amp; place</summary>
@@ -628,6 +634,10 @@ export function Capture() {
                 {quickLogging ? "Reading…" : "Quick log"}
               </button>
             </div>
+            <SlowHint active={quickLogging}>
+              Splitting your day into meals… the first request can take up to a minute
+              while the free server wakes up.
+            </SlowHint>
           </form>
         </>
       )}
@@ -765,32 +775,20 @@ function QuickLogReview({
     }
   }
 
-  // Success — a brief confirmation with a path back to a fresh quick log.
+  // Success — a brief celebration with a path back to a fresh quick log.
   if (savedCount !== null) {
     return (
       <div className="card card-pad" style={{ height: "100%" }}>
-        <div
-          className="state"
-          style={{ padding: "40px 12px", height: "100%", justifyContent: "center" }}
-        >
-          <div className="state-icon" style={{ color: "var(--good)" }}>
-            <IconCheck />
-          </div>
-          <div className="state-title">
-            Saved {savedCount} meal{savedCount === 1 ? "" : "s"}
-          </div>
-          <div className="state-msg">
-            They're in your history with full nutrition — open any one to share it with
-            friends.
-          </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-            <Link className="btn btn-ghost" to="/history">
-              See history
-            </Link>
-            <button className="btn btn-primary" onClick={onReset}>
-              Log more
-            </button>
-          </div>
+        <SaveCelebration
+          sub={`${savedCount} meal${savedCount === 1 ? "" : "s"} saved with full nutrition — open any one to share it with friends.`}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+          <Link className="btn btn-ghost" to="/history">
+            See history
+          </Link>
+          <button className="btn btn-primary" onClick={onReset}>
+            Log more
+          </button>
         </div>
       </div>
     );
@@ -1125,6 +1123,8 @@ function DraftEditor({
         </button>
       </div>
 
+      <PortionTips />
+
       {/* Natural-language correction — re-estimates the whole draft in one shot. */}
       <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
         <input
@@ -1309,7 +1309,9 @@ function MealTotals({
         <span className="meal-totals-unit">kcal</span>
       </div>
       <div className="meal-totals-macros">
-        <span className="mt-chip mt-p">{formatNumber(protein, 1)}g protein</span>
+        <span className="mt-chip mt-p mt-lead">
+          {formatNumber(protein, 1)}g protein
+        </span>
         <span className="mt-chip mt-c">{formatNumber(carbs, 1)}g carbs</span>
         <span className="mt-chip mt-f">{formatNumber(fat, 1)}g fat</span>
       </div>
@@ -1318,14 +1320,49 @@ function MealTotals({
   );
 }
 
+/* A warm, brief reward on save. Gentle encouragement (not a loud game) — the
+ * whole app is supportive accountability, so we celebrate the *act* of logging. */
+const CELEBRATIONS = [
+  "Nice — logged!",
+  "Boom. Logged!",
+  "Logged. Well done!",
+  "Another one down!",
+  "That's in the books!",
+];
+function SaveCelebration({ sub }: { sub: string }) {
+  const title = useMemo(
+    () => CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)],
+    [],
+  );
+  return (
+    <div className="celebrate">
+      <div className="celebrate-badge">
+        <IconCheck />
+      </div>
+      <div className="celebrate-copy">
+        <div className="celebrate-title">{title} 🎉</div>
+        <div className="celebrate-sub">{sub}</div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Saved meal (step 3) ---------------- */
 function SavedMeal({ meal, onLogAnother }: { meal: Meal; onLogAnother: () => void }) {
   return (
     <div className="card card-pad">
+      <SaveCelebration
+        sub={
+          `Another meal remembered` +
+          (meal.total_protein_g > 0
+            ? ` — +${formatNumber(meal.total_protein_g, 0)} g protein toward today.`
+            : ".")
+        }
+      />
       <div className="card-head">
         <div>
-          <div className="eyebrow" style={{ marginBottom: 4, color: "var(--good)" }}>
-            Saved · {titleCase(meal.meal_type)}
+          <div className="eyebrow" style={{ marginBottom: 4 }}>
+            {titleCase(meal.meal_type)}
           </div>
           <div className="card-title" style={{ fontSize: 17 }}>
             {meal.description}

@@ -18,6 +18,8 @@ import type {
 } from "../api";
 import { useAsync } from "../lib/useAsync";
 import { useProfile } from "../lib/profile";
+import { useAuth } from "../lib/auth";
+import { getYourWhy } from "../lib/welcome";
 import {
   formatNumber,
   formatPercent,
@@ -31,6 +33,7 @@ import { CalorieRing, NutrientBar } from "../components/nutrition";
 import { WeightCard } from "../components/WeightCard";
 import {
   IconBolt,
+  IconCamera,
   IconFlame,
   IconLeaf,
   IconPlate,
@@ -220,8 +223,17 @@ function DashboardBody({
     [period, profile?.updated_at ?? ""],
   );
 
+  const { user } = useAuth();
+  const why = user ? getYourWhy(user.user_id) : "";
+
   return (
     <>
+      {why && (
+        <div className="why-banner">
+          <span className="why-banner-label">Your why</span>
+          <span className="why-banner-text">“{why}”</span>
+        </div>
+      )}
       <ConsistencyStrip days={stats.logged_days_7d} />
 
       {/* ---- Calorie goal + macros ---- */}
@@ -256,6 +268,8 @@ function DashboardBody({
                   pct={proteinAdq.pct}
                   status={proteinAdq.status}
                   kind={proteinAdq.kind}
+                  hero
+                  hint="Your #1 macro — it keeps you full and protects muscle in a deficit."
                 />
               ) : (
                 <NutrientBar
@@ -268,6 +282,8 @@ function DashboardBody({
                     (stats.avg_protein_per_day / targets.protein_target_g) * 100,
                   )}
                   kind="target"
+                  hero
+                  hint="Your #1 macro — it keeps you full and protects muscle in a deficit."
                 />
               )}
               <NutrientBar
@@ -496,12 +512,7 @@ function DashboardBody({
           </div>
           {today.loading && <Loading label="Loading today…" />}
           {today.error && <ErrorState message={today.error} onRetry={today.reload} />}
-          {today.data && today.data.length === 0 && (
-            <EmptyState
-              title="Nothing logged today"
-              message="Head to Capture to log your first meal of the day."
-            />
-          )}
+          {today.data && today.data.length === 0 && <TodayEmptyCTA />}
           {today.data && today.data.length > 0 && (
             <div className="grid" style={{ gap: 10 }}>
               {today.data.map((m) => (
@@ -512,6 +523,32 @@ function DashboardBody({
         </section>
       </div>
     </>
+  );
+}
+
+/** Warm, time-aware nudge when nothing's logged today — an invitation, not a scold. */
+function TodayEmptyCTA() {
+  const hour = new Date().getHours();
+  const [title, line] =
+    hour < 11
+      ? ["Start the day strong", "Log breakfast and you're on the board for today."]
+      : hour < 15
+        ? ["What's for lunch?", "A quick photo or a line of text — that's all it takes."]
+        : hour < 18
+          ? ["Afternoon check-in", "Snap a snack or your lunch — every meal counts."]
+          : ["How did today go?", "Even logging one meal keeps your momentum going."];
+  return (
+    <div className="today-empty">
+      <div className="today-empty-badge">
+        <IconCamera />
+      </div>
+      <div className="today-empty-title">{title}</div>
+      <div className="today-empty-msg">{line}</div>
+      <Link to="/capture" className="btn btn-primary">
+        <IconCamera width={17} height={17} />
+        Log a meal
+      </Link>
+    </div>
   );
 }
 

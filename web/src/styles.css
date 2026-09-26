@@ -21,7 +21,9 @@
   /* Ink — soft warm brown, never pure black */
   --text: #362f28;
   --text-secondary: #5f574d;
-  --text-muted: #948a7d;
+  /* Darkened from #948a7d to meet WCAG AA (≥4.5:1) on cream + white surfaces.
+   * Was ~3.2:1 (fail); now ~5.8:1 on white, ~4.7:1 on the darkest card. */
+  --text-muted: #6e6456;
 
   /* Brand — soft, appetizing terracotta, used with a little more confidence */
   --brand: #e3966a;
@@ -58,6 +60,8 @@
   /* Status */
   --good: #4fb98a;
   --danger: #de8a7b;
+  --danger-deep: #bf4e3a; /* AA-contrast terracotta for destructive text/fills */
+  --danger-soft: rgba(191, 78, 58, 0.1);
 
   /* Shape — a touch rounder for a friendlier feel */
   --r-sm: 10px;
@@ -439,6 +443,18 @@ button {
   color: var(--text-muted);
   margin-top: 4px;
 }
+/* Protein = hero macro: a green-tinted KPI that visually leads the group, since
+ * protein is what keeps you full and preserves muscle in a calorie deficit. */
+.kpi-hero {
+  background: rgba(63, 143, 107, 0.07);
+  border-color: rgba(63, 143, 107, 0.24);
+}
+.kpi-hero {
+  --kpi-accent: #3f8f6b;
+}
+.kpi-hero .kpi-value {
+  color: #2f7d5b;
+}
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -498,6 +514,84 @@ button {
 }
 .btn-share svg {
   color: var(--brand-deep);
+}
+
+/* Compact button — used in dense action clusters (meal detail header). */
+.btn-sm {
+  padding: 7px 12px;
+  font-size: 13px;
+}
+.btn-sm svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Destructive actions. `-soft` is the low-commitment trigger (opens a confirm);
+ * the solid `.btn-danger` is the actual, deliberate delete inside that confirm. */
+.btn-danger-soft {
+  background: transparent;
+  border-color: rgba(191, 78, 58, 0.32);
+  color: var(--danger-deep);
+}
+.btn-danger-soft:hover {
+  background: var(--danger-soft);
+  border-color: rgba(191, 78, 58, 0.5);
+}
+.btn-danger-soft svg {
+  color: var(--danger-deep);
+}
+.btn-danger {
+  background: var(--danger-deep);
+  border-color: transparent;
+  color: #fff;
+}
+.btn-danger:hover {
+  background: #a83f2c;
+}
+.btn-danger svg {
+  color: #fff;
+}
+
+/* Inline delete confirmation — a calm, warm-tinted banner, never a jarring modal. */
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--danger-soft);
+  border: 1px solid rgba(191, 78, 58, 0.28);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+.delete-confirm-sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 3px;
+}
+.delete-confirm-err {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--danger-deep);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.delete-confirm-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Meal-detail header action cluster. */
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* ---------- Segmented control ---------- */
@@ -1327,6 +1421,33 @@ button {
   font-size: 14px;
   max-width: 46ch;
 }
+/* Cold-start reassurance — appears only after a wait, so it never adds noise to
+ * a fast response. Warm-tinted, calm, explains the free-tier wake-up. */
+.state-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 42ch;
+  line-height: 1.5;
+  animation: fadeIn 0.4s ease both;
+}
+.state-hint-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: var(--brand-soft);
+  border: 1px solid rgba(189, 104, 57, 0.18);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  color: var(--brand-deep);
+  font-weight: 500;
+}
+.state-hint-inline .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  flex-shrink: 0;
+}
 
 .spinner {
   width: 34px;
@@ -1339,6 +1460,49 @@ button {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Save celebration — a soft pop + rise, warm and encouraging (never confetti-loud) */
+@keyframes celebratePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes celebrateRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .state-hint,
+  .celebrate-badge,
+  .celebrate-copy {
+    animation: none !important;
   }
 }
 
@@ -1623,6 +1787,23 @@ button {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+/* Protein leads the macro list: a soft green-tinted card + a "why" cue. */
+.adq-row-hero {
+  background: rgba(63, 143, 107, 0.06);
+  border: 1px solid rgba(63, 143, 107, 0.2);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  margin: 0 -2px 2px;
+}
+.adq-row-hero .adq-label {
+  font-weight: 700;
+}
+.adq-hint {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-top: 7px;
+  line-height: 1.4;
+}
 
 /* ---------- Profile targets ---------- */
 .target-grid {
@@ -1789,10 +1970,327 @@ button {
   border-color: rgba(189, 104, 57, 0.26);
   background: var(--brand-soft);
 }
+/* Protein leads: a solid, filled chip so it reads as the hero macro. */
+.mt-lead {
+  background: #3f8f6b;
+  border-color: #3f8f6b;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(63, 143, 107, 0.28);
+}
 .meal-totals-hint {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 12px;
+}
+
+/* Save celebration banner — warm reward on a successful log */
+.celebrate {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(
+    100deg,
+    rgba(79, 185, 138, 0.12),
+    rgba(227, 150, 104, 0.12)
+  );
+  border: 1px solid rgba(79, 185, 138, 0.28);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+.celebrate-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--good);
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(79, 185, 138, 0.35);
+  animation: celebratePop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.celebrate-badge svg {
+  width: 24px;
+  height: 24px;
+}
+.celebrate-copy {
+  animation: celebrateRise 0.45s ease 0.08s both;
+}
+.celebrate-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.celebrate-sub {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* Inviting empty state — a warm CTA when nothing's logged yet (never a dead end) */
+.today-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 32px 22px;
+}
+.today-empty-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  margin-bottom: 2px;
+}
+.today-empty-badge svg {
+  width: 27px;
+  height: 27px;
+}
+.today-empty-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.today-empty-msg {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  max-width: 34ch;
+}
+.today-empty .btn {
+  margin-top: 6px;
+}
+
+/* Portion size guide — a calm disclosure that helps eyeball servings */
+.portion-tips {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.portion-tips > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+.portion-tips > summary::-webkit-details-marker {
+  display: none;
+}
+.portion-tips > summary::after {
+  content: "＋";
+  float: right;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.portion-tips[open] > summary::after {
+  content: "－";
+}
+.portion-tips[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+.portion-tips-body {
+  padding: 14px;
+}
+.portion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.portion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.portion-hand {
+  font-size: 20px;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+.portion-ref {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.portion-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.portion-plate {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+@media (max-width: 560px) {
+  .portion-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- First-run welcome ---------- */
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(54, 47, 40, 0.42);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.25s ease both;
+}
+.welcome-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg, 0 24px 60px rgba(54, 47, 40, 0.22));
+  padding: 28px 26px;
+  animation: celebrateRise 0.35s ease both;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+.welcome-dots {
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.welcome-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: background 0.2s, width 0.2s;
+}
+.welcome-dots span.on {
+  width: 22px;
+  border-radius: 4px;
+  background: var(--brand);
+}
+.welcome-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-deep);
+  text-align: center;
+}
+.welcome-title {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-align: center;
+  margin: 6px 0 0;
+  line-height: 1.15;
+}
+.welcome-lede {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 12px auto 0;
+  max-width: 40ch;
+  line-height: 1.5;
+}
+.welcome-props {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 22px 0 4px;
+}
+.welcome-prop {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+.welcome-prop-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  flex-shrink: 0;
+}
+.welcome-prop-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.welcome-prop-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+.welcome-prop-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-top: 1px;
+}
+.welcome-why {
+  width: 100%;
+  margin-top: 18px;
+  min-height: 74px;
+}
+.welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.welcome-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* "Your why" — a warm reminder banner on the dashboard */
+.why-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: linear-gradient(100deg, var(--brand-softer), var(--honey-soft));
+  border: 1px solid rgba(189, 104, 57, 0.18);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.why-banner-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-deep);
+  flex-shrink: 0;
+}
+.why-banner-text {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-style: italic;
+  color: var(--text);
 }
 
 /* Editable draft item cards */
