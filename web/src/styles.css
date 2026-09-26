@@ -2008,6 +2008,39 @@ button {
   font-weight: 700;
 }
 
+/* Capture "More options" collapsible (meal type / time / place) */
+.capture-options {
+  border-top: 1px solid var(--border);
+  padding-top: 2px;
+}
+.capture-options > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+.capture-options > summary::-webkit-details-marker {
+  display: none;
+}
+.capture-options > summary::before {
+  content: "\25B8";
+  color: var(--text-muted);
+  transition: transform 0.15s;
+  display: inline-block;
+}
+.capture-options[open] > summary::before {
+  transform: rotate(90deg);
+}
+.capture-options > summary:hover {
+  color: var(--text);
+}
+
 /* micro strip / grid */
 .micro-strip {
   display: flex;

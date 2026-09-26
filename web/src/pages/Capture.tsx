@@ -500,71 +500,8 @@ export function Capture() {
               />
             </div>
 
-            <div className="form-row">
-              <div className="field">
-                <label className="label" htmlFor="source">
-                  Source
-                </label>
-                <select
-                  id="source"
-                  className="select"
-                  value={source}
-                  onChange={(e) => setSource(e.target.value as CaptureSource)}
-                >
-                  {SOURCES.map((s) => (
-                    <option key={s} value={s}>
-                      {titleCase(s)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label className="label" htmlFor="mealType">
-                  Meal type <span className="opt">· auto</span>
-                </label>
-                <select
-                  id="mealType"
-                  className="select"
-                  value={mealType}
-                  onChange={(e) => setMealType(e.target.value as MealType | "")}
-                >
-                  <option value="">Infer from time</option>
-                  {MEAL_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {titleCase(t)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="label" htmlFor="location">
-                Location <span className="opt">· auto from note</span>
-              </label>
-              <input
-                id="location"
-                className="input"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Chipotle, Home, the office…"
-              />
-            </div>
-
-            <div className="field">
-              <label className="label" htmlFor="eatenAt">
-                When <span className="opt">· defaults to now — set it for an earlier meal</span>
-              </label>
-              <input
-                id="eatenAt"
-                className="input"
-                type="datetime-local"
-                value={eatenAt}
-                max={toLocalInputValue(new Date())}
-                onChange={(e) => setEatenAt(e.target.value)}
-              />
-            </div>
-
+            {/* Analyze sits right after the photo + note — the primary action,
+                not buried under optional fields. */}
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-primary" type="submit" disabled={analyzing}>
                 <IconSpark />
@@ -579,6 +516,75 @@ export function Capture() {
                 Reset
               </button>
             </div>
+
+            {/* Optional meta — all also editable on the draft after analyzing. */}
+            <details className="capture-options">
+              <summary>More options · meal type, time &amp; place</summary>
+              <div className="form-row" style={{ marginTop: 14 }}>
+                <div className="field">
+                  <label className="label" htmlFor="source">
+                    Source
+                  </label>
+                  <select
+                    id="source"
+                    className="select"
+                    value={source}
+                    onChange={(e) => setSource(e.target.value as CaptureSource)}
+                  >
+                    {SOURCES.map((s) => (
+                      <option key={s} value={s}>
+                        {titleCase(s)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label className="label" htmlFor="mealType">
+                    Meal type <span className="opt">· auto</span>
+                  </label>
+                  <select
+                    id="mealType"
+                    className="select"
+                    value={mealType}
+                    onChange={(e) => setMealType(e.target.value as MealType | "")}
+                  >
+                    <option value="">Infer from time</option>
+                    {MEAL_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {titleCase(t)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="field" style={{ marginTop: 14 }}>
+                <label className="label" htmlFor="location">
+                  Location <span className="opt">· auto from note</span>
+                </label>
+                <input
+                  id="location"
+                  className="input"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Chipotle, Home, the office…"
+                />
+              </div>
+
+              <div className="field" style={{ marginTop: 14 }}>
+                <label className="label" htmlFor="eatenAt">
+                  When <span className="opt">· defaults to now — set it for an earlier meal</span>
+                </label>
+                <input
+                  id="eatenAt"
+                  className="input"
+                  type="datetime-local"
+                  value={eatenAt}
+                  max={toLocalInputValue(new Date())}
+                  onChange={(e) => setEatenAt(e.target.value)}
+                />
+              </div>
+            </details>
           </div>
         </form>
 
