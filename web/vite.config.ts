@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "Morsel — Food Memory",
-        short_name: "Morsel",
+        name: "Bite — Food Memory",
+        short_name: "Bite",
         description:
           "Capture meals, track calories & nutrition, and ask your food history in plain language.",
         theme_color: "#12100f",

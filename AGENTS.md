@@ -6,10 +6,14 @@ API shapes: **`API_CONTRACT.md`**. This file is the operator's manual.
 
 ## What it is
 **"Bite"** (the user-facing brand; formerly "Morsel") — a food-memory app. All
-UI wordmarks/titles say "Bite". **Infra keeps the old `morsel` names on purpose**:
-GitHub repo `morsel`, Render `morsel-api-*`, Cloudflare project `morsel`, Neon,
-Expo `scheme: morsel` / `com.morsel.app`. Don't "fix" those to Bite — they're just
-identifiers. Capture a meal (photo + note) → structured,
+UI wordmarks/titles say "Bite", and the web app is deployed to the **Cloudflare
+Pages project `bite`** (URL `bite-b6g.pages.dev`; the PWA installs as "Bite").
+**The remaining infra keeps the old `morsel` names on purpose**: GitHub repo
+`morsel`, Render `morsel-api-*`, Neon + DB roles `morsel_app`/`morsel_ro`, env
+vars `MORSEL_*`, the `morsel_token` localStorage key, Expo `scheme: morsel` /
+`com.morsel.app`. Don't "fix" those to Bite — they're just identifiers. (The old
+`morsel` Pages project / `morsel-7yy.pages.dev` still exists but is no longer the
+deploy target.) Capture a meal (photo + note) → structured,
 nutrition-resolved record → track vs a personalized calorie goal → ask history in
 natural language (a LangGraph router picks aggregate text-to-SQL / semantic
 pgvector+FTS / hybrid). Multi-user (email/password → JWT), per-user data isolated
@@ -18,7 +22,7 @@ by Postgres Row-Level Security.
 ## Live deployment (all free tier)
 | Part | Service | Where |
 |---|---|---|
-| Web (React PWA) | **Cloudflare Pages** (project `morsel`) | https://morsel-7yy.pages.dev |
+| Web (React PWA) | **Cloudflare Pages** (project `bite`) | https://bite-b6g.pages.dev |
 | Backend (FastAPI) | **Render** free (`srv-d9q28vm1egvs73d5rfog`) | https://morsel-api-9s89.onrender.com |
 | DB | **Neon** Postgres + pgvector (us-east-1) | see `NEON_SETUP_DSN` |
 | LLM + embeddings | **Google Gemini** free | `gemini-flash-lite-latest` (chat/vision), `gemini-embedding-001` (768-dim) |
@@ -73,7 +77,7 @@ mobile: `npx tsc --noEmit`.
 cd web
 VITE_API_URL="$RENDER_URL" npm run build      # API URL is baked at build time
 CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… \
-  npx wrangler pages deploy dist --project-name=morsel --branch=main --commit-dirty=true
+  npx wrangler pages deploy dist --project-name=bite --branch=main --commit-dirty=true
 ```
 (creds are in `backend/.env.hosting`). Then commit + push the source too. SPA routing
 relies on `web/public/_redirects`.
