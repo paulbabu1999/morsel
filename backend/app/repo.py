@@ -32,9 +32,14 @@ def _vec_literal(text: str) -> str:
 
 # --- writes ---------------------------------------------------------------
 
-def insert_meal_rows(cur, meal: dict, user_id: str) -> None:
-    """Insert one meal + its items using an existing RLS-scoped cursor."""
-    emb = _vec_literal(meal["description"])
+def insert_meal_rows(cur, meal: dict, user_id: str, embedding: str | None = None) -> None:
+    """Insert one meal + its items using an existing RLS-scoped cursor.
+
+    `embedding` is the pgvector literal for the meal description. Pass it in when
+    computed BEFORE the transaction (see persist_meal) so a network-backed
+    embedding call never holds a scarce pooled connection; when omitted it's
+    computed here (the batch seeder, which isn't on a latency-sensitive path)."""
+    emb = embedding if embedding is not None else _vec_literal(meal["description"])
     cur.execute(
         """INSERT INTO meals
            (id, user_id, eaten_at, meal_type, location_text, photo_uri, photo_uris, note_text,
@@ -65,8 +70,12 @@ def insert_meal_rows(cur, meal: dict, user_id: str) -> None:
 
 
 def persist_meal(meal: dict, user_id: str = config.DEFAULT_USER_ID) -> dict:
+    # Compute the embedding BEFORE opening the transaction: in hosted mode this is
+    # a synchronous Gemini HTTP call (with retries/backoff), and holding one of the
+    # few pooled connections across it would serialize saves and can exhaust the pool.
+    emb = _vec_literal(meal["description"])
     with db.app_tx(user_id) as cur:
-        insert_meal_rows(cur, meal, user_id)
+        insert_meal_rows(cur, meal, user_id, embedding=emb)
     return get_meal(meal["id"], user_id)
 
 
@@ -128,15 +137,34 @@ def suggested_meals(
         recent = ([m for m in recent if m["meal_type"] == meal_type]
                   + [m for m in recent if m["meal_type"] != meal_type])
     seen: set[str] = set()
-    ids: list[str] = []
+    chosen: list[dict] = []
     for m in recent:
         key = (m.get("description") or "").strip().lower()
         if key and key not in seen:
             seen.add(key)
-            ids.append(m["id"])
-        if len(ids) >= limit:
+            chosen.append(m)
+        if len(chosen) >= limit:
             break
-    return [full for mid in ids if (full := get_meal(mid, user_id))]
+    if not chosen:
+        return []
+    # Attach items for all chosen meals in ONE query instead of an N+1 of get_meal
+    # per suggestion. `recent` rows already carry the full MEAL_COLS, so we only
+    # need their items — grouped to match get_meal's shape exactly.
+    ids = [m["id"] for m in chosen]
+    item_cols = [c for c in _ITEM_COLS if c != "meal_id"]
+    with db.app_tx(user_id) as cur:
+        cur.execute(
+            f"SELECT meal_id, {', '.join(item_cols)} FROM meal_items "
+            f"WHERE meal_id = ANY(%s) ORDER BY meal_id, id",
+            (ids,),
+        )
+        rows = cur.fetchall()
+    items_by_meal: dict[str, list] = {}
+    for r in rows:
+        items_by_meal.setdefault(r.pop("meal_id"), []).append(r)
+    for m in chosen:
+        m["items"] = items_by_meal.get(m["id"], [])
+    return chosen
 
 
 # --- weight ---------------------------------------------------------------

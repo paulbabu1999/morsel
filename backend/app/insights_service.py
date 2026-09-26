@@ -12,6 +12,8 @@ Insight kinds: calorie | nutrient_low | nutrient_high | swap | pattern.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from . import config, db, stats_service
 from .llm import client
 from .nutrition.seed_foods import seed_food_entities
@@ -30,11 +32,19 @@ _NUTRIENT_COL = {
 }
 
 
-def _foods_rich_in(nutrient_col: str, n: int = 2) -> list[str]:
-    """Catalog foods highest per-100g in a nutrient — data-driven suggestions."""
+@lru_cache(maxsize=None)
+def _ranked_names(nutrient_col: str) -> tuple[str, ...]:
+    """Catalog food names ranked by per-100g content of a nutrient. The catalog is
+    a fixed in-process constant, so cache the ranking (an immutable tuple) instead
+    of rebuilding + re-sorting it on every low-nutrient of every /insights call."""
     foods = seed_food_entities()
     ranked = sorted(foods, key=lambda f: f.get(nutrient_col, 0), reverse=True)
-    return [f["canonical_name"] for f in ranked[:n]]
+    return tuple(f["canonical_name"] for f in ranked)
+
+
+def _foods_rich_in(nutrient_col: str, n: int = 2) -> list[str]:
+    """Catalog foods highest per-100g in a nutrient — data-driven suggestions."""
+    return list(_ranked_names(nutrient_col)[:n])
 
 
 def _top_contributors(nutrient_col: str, start, end, user_id: str, n: int = 2) -> list[dict]:
