@@ -11,6 +11,17 @@ export function parseLocal(iso: string): Date {
   return new Date((iso || '').replace(/Z$/, ''));
 }
 
+/**
+ * Format a Date as a naive local ISO string ("2026-07-22T19:59:00") — the
+ * wall-clock the backend stores and `parseLocal` reads back. Use this instead of
+ * `Date.toISOString()` (UTC "Z"), which would shift the stored time by the
+ * device's timezone offset.
+ */
+export function toNaiveLocalISO(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

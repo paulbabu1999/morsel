@@ -366,7 +366,7 @@ function notifyAuthExpired(): void {
 // ---------------------------------------------------------------------------
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: BodyInit;
   headers?: Record<string, string>;
   /**
@@ -564,6 +564,20 @@ export function createMeal(body: MealCreate): Promise<Meal> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+/** Edit a saved meal in place (re-resolves nutrition for the possibly-changed items). */
+export function updateMeal(id: string, body: MealCreate): Promise<Meal> {
+  return request<Meal>(`/meals/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Permanently delete a saved meal. */
+export function deleteMeal(id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/meals/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export function askQuery(question: string): Promise<QueryResponse> {

@@ -30,7 +30,7 @@ import {
   type MealItemInput,
   type MealType,
 } from '../api';
-import { capitalize, round, withCommas } from '../utils/format';
+import { capitalize, round, toNaiveLocalISO, withCommas } from '../utils/format';
 
 type SourceOption = 'phone' | 'glasses';
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -192,9 +192,10 @@ export function CaptureScreen() {
         note: note.trim() || null,
         source: source as CaptureSource,
         photo_uri: draft?.photo_uri ?? null,
-        // `null` means "now": resolve a fresh timestamp at save time. A chosen
-        // wall-clock Date is sent as UTC ISO; the backend normalizes to naive UTC.
-        eaten_at: (eatenAt ?? new Date()).toISOString(),
+        // `null` means "now": the server stamps a fresh timestamp at save time. A
+        // chosen wall-clock is sent as naive local (matches how the app reads times
+        // back via parseLocal); sending UTC here would shift the stored time.
+        eaten_at: eatenAt ? toNaiveLocalISO(eatenAt) : null,
       });
       setSaved(meal);
     } catch (e) {

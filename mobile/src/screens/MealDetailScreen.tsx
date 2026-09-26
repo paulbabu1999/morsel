@@ -1,20 +1,50 @@
-import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { RouteProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, font, radius, spacing } from '../theme';
 import { Card, SectionTitle, SourceBadge, Tag } from '../components/ui';
 import { MacroRow } from '../components/Macros';
 import { NutrientChips } from '../components/Nutrition';
 import { ShareMealButton } from '../components/ShareMealButton';
 import { Loading, ErrorView } from '../components/StateViews';
-import { getMeal, type Meal } from '../api';
+import { deleteMeal, getMeal, type Meal } from '../api';
 import { useAsync } from '../hooks/useAsync';
 import type { RootStackParamList } from '../navigation/types';
 import { capitalize, formatWhen, round, withCommas } from '../utils/format';
 
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
 export function MealDetailScreen({ route }: { route: RouteProp<RootStackParamList, 'MealDetail'> }) {
   const { mealId } = route.params;
+  const navigation = useNavigation<Nav>();
   const { data, loading, error, reload } = useAsync<Meal>(() => getMeal(mealId), [mealId]);
+  const [deleting, setDeleting] = useState(false);
+
+  function confirmDelete() {
+    Alert.alert(
+      'Delete this meal?',
+      "This permanently removes it from your history. This can't be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteMeal(mealId);
+              navigation.goBack();
+            } catch {
+              setDeleting(false);
+              Alert.alert('Could not delete', 'Please try again in a moment.');
+            }
+          },
+        },
+      ],
+    );
+  }
 
   if (loading) return <View style={styles.fill}><Loading label="Loading meal…" /></View>;
   if (error || !data) return <View style={styles.fill}><ErrorView error={error} onRetry={reload} /></View>;
@@ -51,6 +81,19 @@ export function MealDetailScreen({ route }: { route: RouteProp<RootStackParamLis
       </View>
 
       <ShareMealButton mealId={meal.id} />
+
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={confirmDelete}
+        disabled={deleting}
+        activeOpacity={0.7}
+      >
+        {deleting ? (
+          <ActivityIndicator size="small" color={colors.danger} />
+        ) : (
+          <Text style={styles.deleteBtnText}>Delete meal</Text>
+        )}
+      </TouchableOpacity>
 
       <SectionTitle style={styles.section}>Micronutrients</SectionTitle>
       <Card>
@@ -163,4 +206,15 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   confidence: { marginTop: spacing.xl, alignItems: 'center' },
   confidenceText: { fontSize: font.tiny, color: colors.textFaint },
+  deleteBtn: {
+    marginTop: spacing.md,
+    height: 46,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtnText: { color: colors.danger, fontSize: font.body, fontWeight: '700' },
 });
