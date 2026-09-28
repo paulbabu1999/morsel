@@ -37,7 +37,7 @@ commit either**; there's a safety-gate step in every commit below.
 ## Repo layout
 ```
 backend/   FastAPI. app/{auth,db,config,embeddings,sql_guard,retrieval,repo,
-           capture_service,stats_service,insights_service,seed,sample_data,main}.py
+           capture_service,stats_service,insights_service,analytics_service,seed,sample_data,main}.py
            app/nutrition/{usda,resolve,seed_foods}  app/llm/{client,extract,classify,
            sql,synthesize,targets}  app/graph/{build,nodes,state} (LangGraph router)
            db/*.sql (local schema)  eval/  tests/
@@ -100,6 +100,8 @@ the Render URL. Run in Expo Go (`npx expo start`) or build an APK:
 | `EMBED_PROVIDER` | **local** (fastembed 384) | **gemini** (`gemini-embedding-001`, 768) |
 | `EMBED_DIM` | 384 | 768 |
 | `MORSEL_APP_DSN` / `MORSEL_RO_DSN` | localhost:5433 roles | Neon **`morsel_app`** (non-bypass!) / `morsel_ro` — NOT `neondb_owner` |
+| `MORSEL_ANALYTICS_DSN` | localhost `morsel_analytics` role (default) | Neon **`morsel_analytics`** (BYPASSRLS, read-only) — admin dashboard ONLY, never LLM SQL |
+| `ADMIN_EMAILS` | your email (unlocks `/admin/analytics`) | same — comma-separated, **fail-closed** (empty ⇒ nobody is admin) |
 | `JWT_SECRET` | dev default | random secret |
 | `SEED_ON_SIGNUP` | 1 (demo data) | **0** (real users start empty) |
 | `GEMINI_API_KEY` / `USDA_API_KEY` | real keys | same |
@@ -109,6 +111,24 @@ the Render URL. Run in Expo Go (`npx expo start`) or build an APK:
 Every data endpoint takes `user_id = Depends(auth.current_user_id)`; that id is set as
 the `app.current_user_id` GUC per transaction (`db.app_tx` / `run_readonly_sql`), so RLS
 isolates each user. Public routes: `/health`, `/auth/*`, `/query/examples`.
+
+## Analytics (operator dashboard)
+A private, owner-only dashboard at web `/admin/analytics` (nav link shows only for admins;
+mobile has none). Two data sources: **derived** aggregates over existing tables and an
+append-only **`events`** table (`repo.log_event`, best-effort via `BackgroundTasks` — never
+blocks/breaks a request). Clients POST allowlisted events (`app_open`, …) to `POST /events`.
+- **Admin gate**: `auth.require_admin` (email in `ADMIN_EMAILS`, fail-closed) guards every
+  `GET /admin/analytics/*` route + `POST /admin/analytics/prune`. `is_admin` on `/auth/me`
+  is only cosmetic (nav visibility); the endpoint check is the real gate.
+- **Cross-user reads** go through `db.run_analytics_sql` on the dedicated **`morsel_analytics`**
+  role (BYPASSRLS + read-only) — `morsel_app` is NOBYPASSRLS and can't aggregate across users.
+  This role must ONLY ever run the hand-written SQL in `app/analytics_service.py` — **never
+  LLM-generated SQL** (that stays on `morsel_ro`). `events` is REVOKE'd from `morsel_ro`.
+- **Endpoints**: `/admin/analytics/{overview,growth,engagement,retention,outcomes,system}`.
+  North-Star metric = **Weekly Active Loggers** (distinct users who logged a meal in 7d).
+- **Retention** (free tier 0.5 GB): raw events pruned >90d via `POST /admin/analytics/prune`.
+- Schema lives in both `backend/db/02_schema.sql` (local) + `deploy/neon_setup.sql` (hosted);
+  `events` DDL is identical (no vector). See the Gotcha below before touching roles.
 
 ## Gotchas — read before touching these
 - **Embedding provider ↔ column dim must match.** local=384, hosted=768. Never point a
@@ -127,6 +147,12 @@ isolates each user. Public routes: `/health`, `/auth/*`, `/query/examples`.
   `morsel_app` is already non-bypass, so this bug is Neon-only. See `deploy/neon_setup.sql`.
 - **text-to-SQL** runs on the read-only `morsel_ro` role via `sql_guard` (single SELECT,
   table allowlist, forced LIMIT); `users` is revoked from it.
+- **Analytics `morsel_analytics` role (BYPASSRLS)**: it can read every user's rows, so it's the
+  one credential that would defeat RLS if misused. Invariants: it's read-only (SELECT + read-only
+  txn), never granted `password_hash`, used ONLY by `analytics_service.py` via `run_analytics_sql`,
+  and **must never touch `ro_pool`/LLM SQL**. If a Neon project refuses to create a BYPASSRLS role,
+  use the NOBYPASSRLS + per-table `FOR SELECT TO morsel_analytics USING (true)` fallback (noted in
+  `deploy/neon_setup.sql`) — no app-code change.
 - **Timestamps** are naive `timestamp` (no `Z`) = wall clock; clients parse as local.
 - **Render free cold-starts** ~30–60s after ~15 min idle. **Neon** auto-suspends too.
   Mobile uses a 30s timeout for auth calls (`AUTH_REQUEST_TIMEOUT_MS`).
@@ -155,6 +181,7 @@ Local: `POST /admin/reset` (authed — resets the current user to seeded sample 
 | NL correction ("Fix it") | `POST /capture/refine`; `app/llm/extract.py:refine_meal` |
 | Feed empty / wrong / leaking | `app/social.py` (NO RLS on social tables — visibility is in the queries) |
 | Dashboard stale after edit | `web/src/pages/Dashboard.tsx` (profile.updated_at dep) |
+| Analytics 403 / dashboard empty / wrong numbers | `app/auth.py` (`require_admin`/`ADMIN_EMAILS`), `app/analytics_service.py`, `morsel_analytics` role + grants |
 | Hosted embeddings failing | `app/embeddings.py` (`_embed_gemini`), Render `EMBED_*` env |
 | Deploy issues | `docs/HOSTING.md`, Render/Cloudflare dashboards, `backend/.env.hosting` |
 

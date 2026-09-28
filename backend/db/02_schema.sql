@@ -243,3 +243,25 @@ CREATE TABLE IF NOT EXISTS shared_meals (
 );
 CREATE INDEX IF NOT EXISTS shared_meals_user_idx ON shared_meals (user_id, shared_at DESC);
 CREATE INDEX IF NOT EXISTS shared_meals_group_idx ON shared_meals (group_id, shared_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Analytics events — append-only operator/behavioral telemetry. Cross-user by
+-- nature (the admin dashboard aggregates across everyone), so NO row-level
+-- security — like the social tables. Written best-effort by app/repo.log_event;
+-- read only by the dedicated morsel_analytics role (see 03_roles.sql). The LLM
+-- text-to-SQL role (morsel_ro) is explicitly REVOKEd from it there.
+-- BIGINT IDENTITY needs no sequence grant (works on both local + Neon).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS events (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id     TEXT,                                 -- nullable (anon/server events); no FK
+    session_id  TEXT,
+    event       TEXT      NOT NULL,
+    ts          TIMESTAMP NOT NULL DEFAULT now(),     -- server wall-clock, like every other ts
+    platform    TEXT,                                 -- web | ios | android | server
+    duration_ms INTEGER,
+    props       JSONB     NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS events_ts_idx       ON events (ts DESC);
+CREATE INDEX IF NOT EXISTS events_event_ts_idx ON events (event, ts DESC);
+CREATE INDEX IF NOT EXISTS events_user_ts_idx  ON events (user_id, ts DESC);

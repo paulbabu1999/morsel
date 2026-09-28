@@ -24,6 +24,7 @@ from . import config
 
 _app_pool: ConnectionPool | None = None
 _ro_pool: ConnectionPool | None = None
+_analytics_pool: ConnectionPool | None = None
 
 
 def _configure(conn: psycopg.Connection) -> None:
@@ -55,12 +56,24 @@ def ro_pool() -> ConnectionPool:
     return _ro_pool
 
 
+def analytics_pool() -> ConnectionPool:
+    """Read-only, cross-user (BYPASSRLS) pool for the admin analytics endpoints ONLY.
+    min_size=0 so it holds no idle Neon connection when the dashboard is unused."""
+    global _analytics_pool
+    if _analytics_pool is None:
+        _analytics_pool = ConnectionPool(
+            config.ANALYTICS_DSN, min_size=0, max_size=2, kwargs=_PG_KWARGS,
+            configure=_configure, open=True,
+        )
+    return _analytics_pool
+
+
 def close_pools() -> None:
-    global _app_pool, _ro_pool
-    for p in (_app_pool, _ro_pool):
+    global _app_pool, _ro_pool, _analytics_pool
+    for p in (_app_pool, _ro_pool, _analytics_pool):
         if p is not None:
             p.close()
-    _app_pool = _ro_pool = None
+    _app_pool = _ro_pool = _analytics_pool = None
 
 
 @contextmanager
@@ -93,6 +106,24 @@ def run_readonly_sql(
                 cur.execute(sql, params or ())
                 # psycopg returns numeric as Decimal -> serializes as a JSON
                 # string; convert so aggregate facts are real numbers.
+                return [_floatify(row) for row in cur.fetchall()]
+
+
+def run_analytics_sql(
+    sql: str, params: dict[str, Any] | tuple | None = None
+) -> list[dict[str, Any]]:
+    """Execute a hand-written, parameterized aggregate on the analytics role.
+
+    Cross-user by design: the analytics role is BYPASSRLS and NO
+    `app.current_user_id` GUC is set, so counts/sums span every user. This path
+    must ONLY ever run trusted, developer-authored SQL (never LLM-generated SQL,
+    never raw user input beyond validated ints/dates) — that is what keeps the
+    BYPASSRLS blast radius bounded. Runs read-only (the role also forces it).
+    """
+    with analytics_pool().connection() as conn:
+        with conn.transaction():
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(sql, params or ())
                 return [_floatify(row) for row in cur.fetchall()]
 
 

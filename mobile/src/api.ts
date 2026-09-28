@@ -5,6 +5,7 @@
  * All network calls go through `request()`, which adds a timeout and converts
  * low-level fetch failures into a friendly, actionable ApiError.
  */
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { API_URL, AUTH_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from './config';
 
@@ -329,6 +330,26 @@ async function clearToken(): Promise<void> {
   authToken = null;
   try {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Fire-and-forget client telemetry (e.g. app_open) for the operator analytics
+ * dashboard. A bare fetch — never retried, never awaited by callers — so it can
+ * never delay or break the app; failures are swallowed. Only allowlisted event
+ * names are accepted by the backend, and it's skipped entirely when logged out.
+ */
+export function logEvent(event: string, props: Record<string, unknown> = {}): void {
+  const token = getToken();
+  if (!token) return;
+  try {
+    fetch(`${API_URL}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ event, platform: Platform.OS, props }),
+    }).catch(() => {});
   } catch {
     // ignore
   }

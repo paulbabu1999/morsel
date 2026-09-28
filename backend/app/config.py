@@ -40,6 +40,12 @@ RO_DSN = os.getenv(
     "MORSEL_RO_DSN",
     f"host={PGHOST} port={PGPORT} dbname={PGDATABASE} user=morsel_ro password=morsel_ro_pw",
 )
+# Read-only, cross-user (BYPASSRLS) role used ONLY by the admin analytics endpoints.
+# Never runs LLM-generated SQL. See deploy/neon_setup.sql / db/03_roles.sql.
+ANALYTICS_DSN = os.getenv(
+    "MORSEL_ANALYTICS_DSN",
+    f"host={PGHOST} port={PGPORT} dbname={PGDATABASE} user=morsel_analytics password=morsel_analytics_pw",
+)
 
 # --- Identity (single implicit user for now; RLS plumbing is real) --------
 DEFAULT_USER_ID = os.getenv("MORSEL_USER_ID", "user-1")
@@ -48,6 +54,21 @@ DEFAULT_USER_ID = os.getenv("MORSEL_USER_ID", "user-1")
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-insecure-change-me-in-prod")
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "720"))  # 30 days
 SEED_ON_SIGNUP = os.getenv("SEED_ON_SIGNUP", "1") == "1"  # give new users sample data
+
+# --- Admin / analytics ----------------------------------------------------
+# Operator allowlist for the analytics dashboard. Comma-separated emails; matched
+# case-insensitively against the authed user's email. FAIL-CLOSED: empty => nobody
+# is admin. Set ADMIN_EMAILS on the hosted box (and backend/.env for local).
+ADMIN_EMAILS = frozenset(
+    e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
+)
+# Event names a *client* (web/mobile) is allowed to POST to /events. Server-side
+# events (meal_create, query_asked, …) are logged in-process and are NOT gated by
+# this — this only bounds what an authenticated client can inject.
+_DEFAULT_CLIENT_EVENTS = "app_open,screen_view,pwa_install"
+EVENT_ALLOWLIST = frozenset(
+    e.strip() for e in os.getenv("EVENT_ALLOWLIST", _DEFAULT_CLIENT_EVENTS).split(",") if e.strip()
+)
 
 # --- LLM (provider-agnostic) ----------------------------------------------
 # LLM_PROVIDER: gemini | anthropic | openai | groq | openrouter | ollama | vllm | "" (stub)

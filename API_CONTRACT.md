@@ -11,9 +11,9 @@ CORS is open. **Multi-user: email/password → JWT.** Every endpoint except
 data is isolated per user via Row-Level Security.
 
 ## Auth
-- `POST /auth/signup` `{email, password}` → `{token, user_id, email}` (password ≥ 8 chars; 409 if email taken). New accounts are seeded with sample meals in the background.
-- `POST /auth/login` `{email, password}` → `{token, user_id, email}` (401 on mismatch).
-- `GET /auth/me` (Bearer) → `{user_id, email}`.
+- `POST /auth/signup` `{email, password}` → `{token, user_id, email, is_admin}` (password ≥ 8 chars; 409 if email taken). New accounts are seeded with sample meals in the background.
+- `POST /auth/login` `{email, password}` → `{token, user_id, email, is_admin}` (401 on mismatch).
+- `GET /auth/me` (Bearer) → `{user_id, email, display_name, is_admin}`. `is_admin` = email in server `ADMIN_EMAILS` (gates the analytics dashboard UI only).
 - Send `Authorization: Bearer <token>` on all other calls. Missing/invalid → 401/403.
 
 ## Nutrient set
@@ -152,6 +152,19 @@ optional LLM-written headline):
 Color `severity` (info=gray, suggest=blue, watch=amber). Never judgmental.
 
 ### `POST /admin/reset` → reseed sample data. `{ food_entities_added, meals_added }`
+
+## Telemetry & admin analytics
+- `POST /events` (Bearer) `{event, session_id?, platform?, props?}` → `{ok:true}`. Best-effort
+  client telemetry; `event` must be in the server allowlist (`app_open`, `screen_view`, …) else 400.
+- **Admin only** (email in `ADMIN_EMAILS`, else **403**) — the operator dashboard:
+  - `GET /admin/analytics/overview` → headline KPIs (users, new-users 1/7/30d, total/7d meals,
+    weekly/daily/monthly active loggers, adherent loggers, app-open DAU/WAU, events, db size MB).
+  - `GET /admin/analytics/growth?days=&tz_offset=` → `{days, by_day:[{date, signups, cumulative_users, active_loggers, meals}]}`.
+  - `GET /admin/analytics/engagement?days=` → capture/query/edit mix, device & meal-type mix, weigh-ins.
+  - `GET /admin/analytics/retention?weeks=` → `{weeks, cohorts:[{cohort_start, size, retained:[…]}]}`.
+  - `GET /admin/analytics/outcomes` → goal distribution, weight change 30/90d, calorie/protein adherence.
+  - `GET /admin/analytics/system?days=` → LLM fallback rate, latency p50/p95, data-quality rates, events/day.
+  - `POST /admin/analytics/prune?days=90` → `{deleted}` (drop raw events older than `days`).
 
 ## Frontend notes
 - Timestamps are naive local ISO (no `Z`) — parse as local.

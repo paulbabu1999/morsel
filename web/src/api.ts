@@ -254,6 +254,95 @@ export interface StatsResponse {
   by_meal_type: Record<string, number>;
 }
 
+/* ---- Admin analytics (operator dashboard; cross-user) ---- */
+
+export interface AnalyticsOverview {
+  generated_at: string;
+  total_users: number;
+  new_users_1d: number;
+  new_users_7d: number;
+  new_users_30d: number;
+  total_meals: number;
+  meals_today: number;
+  meals_7d: number;
+  weekly_active_loggers: number; // North Star
+  daily_active_loggers: number;
+  monthly_active_loggers: number;
+  adherent_loggers_7d: number;
+  app_open_dau: number;
+  app_open_wau: number;
+  total_events: number;
+  db_size_mb: number;
+}
+
+export interface GrowthDay {
+  date: string;
+  signups: number;
+  cumulative_users: number;
+  active_loggers: number;
+  meals: number;
+}
+export interface GrowthResponse {
+  days: number;
+  by_day: GrowthDay[];
+}
+
+export interface EngagementResponse {
+  days: number;
+  device_mix: Record<string, number>;
+  meal_types: Record<string, number>;
+  event_counts: Record<string, number>;
+  capture_methods: Record<string, number>;
+  edits: number;
+  deletes: number;
+  refines: number;
+  query_volume: number;
+  query_ok_rate: number;
+  query_routes: Record<string, number>;
+  weigh_ins: number;
+  meals_per_active_logger_7d: number;
+}
+
+export interface RetentionCohort {
+  cohort_start: string;
+  size: number;
+  retained: number[]; // index = week offset (0..weeks)
+}
+export interface RetentionResponse {
+  weeks: number;
+  cohorts: RetentionCohort[];
+}
+
+export interface WeightOutcome {
+  users: number;
+  avg_change_kg: number;
+  pct_toward_goal: number;
+}
+export interface OutcomesResponse {
+  goal_distribution: Record<string, number>;
+  users_with_goal: number;
+  users_tracking_weight: number;
+  weight_30d: WeightOutcome;
+  weight_90d: WeightOutcome;
+  calorie_adherence: number;
+  protein_adherence: number;
+  adherence_target_days: number;
+}
+
+export interface SystemResponse {
+  days: number;
+  events_by_day: { date: string; count: number }[];
+  event_latency_ms: Record<string, { n: number; p50: number | null; p95: number | null }>;
+  llm_fallback_rate: number;
+  llm_calls: number;
+  query_empty_rate: number;
+  avg_meal_confidence: number;
+  low_confidence_meal_rate: number;
+  zero_kcal_meal_rate: number;
+  entity_resolution_rate: number;
+  catalog_composition: Record<string, number>;
+}
+
 export type InsightKind =
   | "calorie"
   | "nutrient_low"
@@ -288,6 +377,8 @@ export interface AuthResult {
   token: string;
   user_id: string;
   email: string;
+  /** Operator flag (email in the backend ADMIN_EMAILS allowlist). */
+  is_admin?: boolean;
 }
 
 /** Returned by GET /auth/me. */
@@ -296,6 +387,8 @@ export interface AuthUser {
   email: string;
   /** The name friends see. Null/absent until the user sets one. */
   display_name?: string | null;
+  /** True only for operators — gates the Analytics nav link (never access control). */
+  is_admin?: boolean;
 }
 
 /* ------------------------------------------------------------------ *
@@ -310,6 +403,7 @@ export interface MeResponse {
   user_id: string;
   email: string;
   display_name: string | null;
+  is_admin?: boolean;
 }
 
 /** A person in search results or a connections list. */
@@ -552,6 +646,42 @@ export interface CaptureInput {
  */
 export function warmup(): void {
   fetch(`${API_URL}/health`).catch(() => {});
+}
+
+/** A per-tab session id (for grouping telemetry). Stable across route changes,
+ *  fresh per new tab/session. */
+const SESSION_KEY = "morsel_session_id";
+export function getSessionId(): string {
+  try {
+    let sid = sessionStorage.getItem(SESSION_KEY);
+    if (!sid) {
+      sid = crypto?.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem(SESSION_KEY, sid);
+    }
+    return sid;
+  } catch {
+    return "no-session";
+  }
+}
+
+/**
+ * Fire-and-forget client telemetry. A bare, non-retrying fetch (unlike `request`)
+ * so it can never delay, retry, or break the app — failures are swallowed. Only
+ * event names in the backend allowlist are accepted; skipped when logged out.
+ */
+export function logEvent(event: string, props: Record<string, unknown> = {}): void {
+  const token = getToken();
+  if (!token) return;
+  try {
+    fetch(`${API_URL}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ event, platform: "web", session_id: getSessionId(), props }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
 }
 
 export const api = {
@@ -821,4 +951,23 @@ export const api = {
         body: JSON.stringify({ token }),
       },
     ),
+
+  /* ---- Admin analytics (operator-only; every route is require_admin on the server) ---- */
+  analytics: {
+    overview: () => request<AnalyticsOverview>("/admin/analytics/overview"),
+    growth: (days = 30) =>
+      request<GrowthResponse>(
+        `/admin/analytics/growth${toQuery({ days, tz_offset: new Date().getTimezoneOffset() })}`,
+      ),
+    engagement: (days = 30) =>
+      request<EngagementResponse>(`/admin/analytics/engagement${toQuery({ days })}`),
+    retention: (weeks = 8) =>
+      request<RetentionResponse>(`/admin/analytics/retention${toQuery({ weeks })}`),
+    outcomes: () => request<OutcomesResponse>("/admin/analytics/outcomes"),
+    system: (days = 7) => request<SystemResponse>(`/admin/analytics/system${toQuery({ days })}`),
+    prune: (days = 90) =>
+      request<{ deleted: number }>(`/admin/analytics/prune${toQuery({ days })}`, {
+        method: "POST",
+      }),
+  },
 };

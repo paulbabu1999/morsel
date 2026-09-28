@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from time import perf_counter
 from typing import Optional
 
 from fastapi import (
@@ -23,16 +24,30 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import auth, capture_service, config, db, insights_service, repo, seed, social, stats_service
+from . import (
+    analytics_service,
+    auth,
+    capture_service,
+    config,
+    db,
+    insights_service,
+    repo,
+    seed,
+    social,
+    stats_service,
+)
 from .graph import run_query
 from .llm.targets import recommend_targets
 from .models import (
+    AnalyticsOverview,
     AuthResponse,
     CaptureDraft,
     CaptureSource,
     DisplayNameRequest,
+    EventRequest,
     GroupCreateRequest,
     GroupJoinRequest,
+    GrowthResponse,
     InsightsResponse,
     InviteAcceptRequest,
     LoginRequest,
@@ -54,6 +69,13 @@ from .models import (
 )
 
 CurrentUser = Depends(auth.current_user_id)
+AdminUser = Depends(auth.require_admin)
+
+
+def _llm_tag() -> str:
+    """Coarse per-request signal of whether a real LLM served the request vs the
+    deterministic stub, for the analytics fallback-rate metric."""
+    return "real" if config.USE_REAL_LLM else "stub"
 
 
 @asynccontextmanager
@@ -113,13 +135,21 @@ def signup(body: SignupRequest, bg: BackgroundTasks) -> AuthResponse:
     user_id, token = auth.signup(body.email, body.password)
     if config.SEED_ON_SIGNUP:
         bg.add_task(seed.seed_all, user_id)  # sample meals so the app isn't empty
-    return AuthResponse(token=token, user_id=user_id, email=body.email.strip().lower())
+    bg.add_task(repo.log_event, "signup", user_id, props={"platform": "web"})
+    return AuthResponse(
+        token=token, user_id=user_id, email=body.email.strip().lower(),
+        is_admin=auth.is_admin(user_id),
+    )
 
 
 @app.post("/auth/login", response_model=AuthResponse)
-def login(body: LoginRequest) -> AuthResponse:
+def login(body: LoginRequest, bg: BackgroundTasks) -> AuthResponse:
     user_id, token = auth.login(body.email, body.password)
-    return AuthResponse(token=token, user_id=user_id, email=body.email.strip().lower())
+    bg.add_task(repo.log_event, "login", user_id)
+    return AuthResponse(
+        token=token, user_id=user_id, email=body.email.strip().lower(),
+        is_admin=auth.is_admin(user_id),
+    )
 
 
 @app.get("/auth/me", response_model=MeResponse)
@@ -127,7 +157,10 @@ def me(user_id: str = CurrentUser) -> MeResponse:
     u = repo.get_user(user_id)
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
-    return MeResponse(user_id=u["id"], email=u["email"], display_name=u.get("display_name"))
+    return MeResponse(
+        user_id=u["id"], email=u["email"], display_name=u.get("display_name"),
+        is_admin=auth.is_admin(user_id),
+    )
 
 
 # --- social ----------------------------------------------------------------
@@ -240,9 +273,13 @@ def get_profile(user_id: str = CurrentUser) -> Optional[Profile]:
 
 
 @app.post("/profile", response_model=Profile)
-def set_profile(body: ProfileInput, user_id: str = CurrentUser) -> Profile:
+def set_profile(body: ProfileInput, bg: BackgroundTasks, user_id: str = CurrentUser) -> Profile:
     targets = recommend_targets(body.model_dump())
     saved = repo.upsert_profile({**body.model_dump(), **targets}, user_id)
+    bg.add_task(
+        repo.log_event, "profile_set", user_id,
+        props={"goal_type": saved.get("goal_type"), "onboarded": saved.get("onboarded")},
+    )
     return Profile(**saved)
 
 
@@ -254,17 +291,20 @@ def get_weights(user_id: str = CurrentUser) -> list[WeightLog]:
 
 
 @app.post("/weight", response_model=WeightLog)
-def log_weight(body: WeightLogInput, user_id: str = CurrentUser) -> WeightLog:
+def log_weight(body: WeightLogInput, bg: BackgroundTasks, user_id: str = CurrentUser) -> WeightLog:
     if not (20 <= body.weight_kg <= 400):
         raise HTTPException(status_code=400, detail="Weight looks out of range")
     at = capture_service._normalize_eaten_at(body.logged_at)
-    return WeightLog(**repo.add_weight(user_id, body.weight_kg, at))
+    saved = repo.add_weight(user_id, body.weight_kg, at)
+    bg.add_task(repo.log_event, "weight_log", user_id)
+    return WeightLog(**saved)
 
 
 # --- capture ---------------------------------------------------------------
 
 @app.post("/capture/analyze", response_model=CaptureDraft)
 def capture_analyze(
+    bg: BackgroundTasks,
     photos: Optional[list[UploadFile]] = File(None),  # multiple: final dish + ingredients
     photo: Optional[UploadFile] = File(None),          # legacy single-photo clients
     note: Optional[str] = Form(None),
@@ -273,6 +313,7 @@ def capture_analyze(
     source: CaptureSource = Form(CaptureSource.phone),
     user_id: str = CurrentUser,
 ) -> CaptureDraft:
+    t0 = perf_counter()
     files = list(photos or [])
     if photo:
         files.append(photo)
@@ -295,15 +336,24 @@ def capture_analyze(
         meal_type=meal_type.value if meal_type else None,
         location=location, source=source.value,
     )
+    bg.add_task(
+        repo.log_event, "capture_analyze", user_id,
+        duration_ms=int((perf_counter() - t0) * 1000),
+        props={
+            "photo_count": len(images), "has_note": bool(note and note.strip()),
+            "extractor": draft.get("extractor", ""), "llm": _llm_tag(),
+        },
+    )
     return CaptureDraft(**draft)
 
 
 @app.post("/capture/refine", response_model=CaptureDraft)
-def capture_refine(body: RefineRequest, user_id: str = CurrentUser) -> CaptureDraft:
+def capture_refine(body: RefineRequest, bg: BackgroundTasks, user_id: str = CurrentUser) -> CaptureDraft:
     """Re-estimate a draft from a plain-language correction (e.g. 'the dal is cooked,
     ~200 cal', 'only 2 rotis'). No DB write — the user still confirms via /meals."""
     if not body.correction.strip():
         raise HTTPException(status_code=400, detail="Empty correction")
+    t0 = perf_counter()
     draft = capture_service.refine(
         items=[i.model_dump() for i in body.items],
         correction=body.correction,
@@ -311,28 +361,48 @@ def capture_refine(body: RefineRequest, user_id: str = CurrentUser) -> CaptureDr
         location=body.location, note=body.note, source=body.source.value,
         photo_uris=body.photo_uris,
     )
+    bg.add_task(
+        repo.log_event, "capture_refine", user_id,
+        duration_ms=int((perf_counter() - t0) * 1000), props={"llm": _llm_tag()},
+    )
     return CaptureDraft(**draft)
 
 
 @app.post("/capture/quicklog", response_model=list[CaptureDraft])
-def capture_quicklog(body: QuickLogRequest, user_id: str = CurrentUser) -> list[CaptureDraft]:
+def capture_quicklog(body: QuickLogRequest, bg: BackgroundTasks, user_id: str = CurrentUser) -> list[CaptureDraft]:
     """Parse free text ('oatmeal + coffee for breakfast, a chicken bowl at lunch, an
     apple') into one or more editable drafts. No DB write — confirm via /meals/batch."""
     if not body.text.strip():
         raise HTTPException(status_code=400, detail="Empty text")
-    return [CaptureDraft(**d) for d in capture_service.quicklog(body.text, body.source.value)]
+    t0 = perf_counter()
+    drafts = capture_service.quicklog(body.text, body.source.value)
+    bg.add_task(
+        repo.log_event, "quicklog", user_id,
+        duration_ms=int((perf_counter() - t0) * 1000),
+        props={"llm": _llm_tag(), "count": len(drafts)},
+    )
+    return [CaptureDraft(**d) for d in drafts]
 
 
 @app.post("/meals", response_model=Meal)
-def create_meal(body: MealCreate, user_id: str = CurrentUser) -> Meal:
+def create_meal(body: MealCreate, bg: BackgroundTasks, user_id: str = CurrentUser) -> Meal:
     if not body.items:
         raise HTTPException(status_code=400, detail="A meal needs at least one item")
     meal = capture_service.build_meal(body.model_dump())
-    return Meal(**repo.persist_meal(meal, user_id))
+    saved = repo.persist_meal(meal, user_id)
+    bg.add_task(
+        repo.log_event, "meal_create", user_id,
+        props={
+            "source": str(saved.get("source", "")), "item_count": len(saved.get("items", [])),
+            "total_calories": saved.get("total_calories", 0),
+            "has_photo": bool(saved.get("photo_uri") or saved.get("photo_uris")),
+        },
+    )
+    return Meal(**saved)
 
 
 @app.post("/meals/batch", response_model=list[Meal])
-def create_meals_batch(bodies: list[MealCreate], user_id: str = CurrentUser) -> list[Meal]:
+def create_meals_batch(bodies: list[MealCreate], bg: BackgroundTasks, user_id: str = CurrentUser) -> list[Meal]:
     """Persist several confirmed meals at once (the multi-meal quick-log flow)."""
     out = []
     for body in bodies:
@@ -342,6 +412,10 @@ def create_meals_batch(bodies: list[MealCreate], user_id: str = CurrentUser) -> 
         out.append(Meal(**repo.persist_meal(meal, user_id)))
     if not out:
         raise HTTPException(status_code=400, detail="No meals with items to save")
+    bg.add_task(
+        repo.log_event, "meal_create", user_id,
+        props={"source": "batch", "count": len(out)},
+    )
     return out
 
 
@@ -382,7 +456,7 @@ def get_meal(meal_id: str, user_id: str = CurrentUser) -> Meal:
 
 
 @app.put("/meals/{meal_id}", response_model=Meal)
-def update_meal(meal_id: str, body: MealCreate, user_id: str = CurrentUser) -> Meal:
+def update_meal(meal_id: str, body: MealCreate, bg: BackgroundTasks, user_id: str = CurrentUser) -> Meal:
     """Edit a saved meal: re-resolve nutrition for the (possibly changed) items and
     replace the row in place, keeping its id. 404 if it isn't the caller's meal."""
     if not body.items:
@@ -391,23 +465,35 @@ def update_meal(meal_id: str, body: MealCreate, user_id: str = CurrentUser) -> M
     updated = repo.update_meal(meal_id, meal, user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Meal not found")
+    bg.add_task(repo.log_event, "meal_edit", user_id)
     return Meal(**updated)
 
 
 @app.delete("/meals/{meal_id}")
-def delete_meal(meal_id: str, user_id: str = CurrentUser) -> dict:
+def delete_meal(meal_id: str, bg: BackgroundTasks, user_id: str = CurrentUser) -> dict:
     if not repo.delete_meal(meal_id, user_id):
         raise HTTPException(status_code=404, detail="Meal not found")
+    bg.add_task(repo.log_event, "meal_delete", user_id)
     return {"ok": True}
 
 
 # --- query -----------------------------------------------------------------
 
 @app.post("/query", response_model=QueryResponse)
-def query(req: QueryRequest, user_id: str = CurrentUser) -> QueryResponse:
+def query(req: QueryRequest, bg: BackgroundTasks, user_id: str = CurrentUser) -> QueryResponse:
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Empty question")
+    t0 = perf_counter()
     result = run_query(req.question, user_id)
+    bg.add_task(
+        repo.log_event, "query_asked", user_id,
+        duration_ms=int((perf_counter() - t0) * 1000),
+        props={
+            "route": str(result.get("route", "")),
+            "ok": bool((result.get("answer") or "").strip()),
+            "llm": _llm_tag(),
+        },
+    )
     result["meals"] = [Meal(**m) for m in result.get("meals", [])]
     return QueryResponse(**result)
 
@@ -445,9 +531,67 @@ def insights(
     return InsightsResponse(**insights_service.compute_insights(period, user_id, tz_offset))
 
 
+# --- telemetry (client-sent) -----------------------------------------------
+
+@app.post("/events")
+def ingest_event(body: EventRequest, bg: BackgroundTasks, user_id: str = CurrentUser) -> dict:
+    """Ingest a client telemetry event (app_open, screen_view, …). Best-effort and
+    fire-and-forget. The event name must be in EVENT_ALLOWLIST so a client can't
+    inject arbitrary event types; props are capped/whitelisted in repo.log_event."""
+    if body.event not in config.EVENT_ALLOWLIST:
+        raise HTTPException(status_code=400, detail="Unknown event")
+    bg.add_task(
+        repo.log_event, body.event, user_id,
+        session_id=body.session_id, platform=(body.platform or "web"), props=body.props,
+    )
+    return {"ok": True}
+
+
 # --- admin -----------------------------------------------------------------
 
 @app.post("/admin/reset")
 def reset(user_id: str = CurrentUser) -> dict:
     """Reset the current user's meals back to freshly-seeded sample data."""
     return seed.reset(user_id)
+
+
+# --- admin analytics (operator dashboard; require_admin gates every route) ---
+
+@app.get("/admin/analytics/overview", response_model=AnalyticsOverview)
+def analytics_overview(_: str = AdminUser) -> AnalyticsOverview:
+    return AnalyticsOverview(**analytics_service.compute_overview())
+
+
+@app.get("/admin/analytics/growth", response_model=GrowthResponse)
+def analytics_growth(
+    days: int = Query(30, ge=1, le=365),
+    tz_offset: int = Query(0, ge=-840, le=840),
+    _: str = AdminUser,
+) -> GrowthResponse:
+    return GrowthResponse(**analytics_service.compute_growth(days, tz_offset))
+
+
+@app.get("/admin/analytics/engagement")
+def analytics_engagement(days: int = Query(30, ge=1, le=365), _: str = AdminUser) -> dict:
+    return analytics_service.compute_engagement(days)
+
+
+@app.get("/admin/analytics/retention")
+def analytics_retention(weeks: int = Query(8, ge=1, le=26), _: str = AdminUser) -> dict:
+    return analytics_service.compute_retention(weeks)
+
+
+@app.get("/admin/analytics/outcomes")
+def analytics_outcomes(_: str = AdminUser) -> dict:
+    return analytics_service.compute_outcomes()
+
+
+@app.get("/admin/analytics/system")
+def analytics_system(days: int = Query(7, ge=1, le=90), _: str = AdminUser) -> dict:
+    return analytics_service.compute_system(days)
+
+
+@app.post("/admin/analytics/prune")
+def analytics_prune(days: int = Query(90, ge=7, le=3650), _: str = AdminUser) -> dict:
+    """Delete events older than `days` (raw-telemetry retention on the free tier)."""
+    return {"deleted": repo.prune_events(days)}

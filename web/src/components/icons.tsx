@@ -35,6 +35,16 @@ export const IconHistory = (p: P) => (
   </svg>
 );
 
+/** Bar chart on axes — the operator analytics destination. */
+export const IconChart = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 3v16a1 1 0 0 0 1 1h16" />
+    <path d="M8 16v-4" />
+    <path d="M13 16V8" />
+    <path d="M18 16v-6" />
+  </svg>
+);
+
 export const IconSpark = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />

@@ -54,12 +54,14 @@ class AuthResponse(BaseModel):
     token: str
     user_id: str
     email: str
+    is_admin: bool = False
 
 
 class MeResponse(BaseModel):
     user_id: str
     email: str
     display_name: Optional[str] = None
+    is_admin: bool = False
 
 
 class MealItem(BaseModel):
@@ -328,3 +330,49 @@ class StatsResponse(BaseModel):
     by_day: list[DayNutrition] = Field(default_factory=list)
     top_foods: list[TopFood] = Field(default_factory=list)
     by_meal_type: dict[str, int] = Field(default_factory=dict)
+
+
+# --- admin analytics (operator dashboard; cross-user) ----------------------
+# Overview + Growth are typed (stable headline shapes); the other endpoints
+# (engagement/retention/outcomes/system) return flexible dicts.
+
+class EventRequest(BaseModel):
+    """A client-sent telemetry event (e.g. app_open). The event name is checked
+    against config.EVENT_ALLOWLIST server-side; props are capped/whitelisted."""
+
+    event: str
+    session_id: Optional[str] = None
+    platform: Optional[str] = None      # web | ios | android
+    props: dict = Field(default_factory=dict)
+
+
+class AnalyticsOverview(BaseModel):
+    generated_at: str
+    total_users: int
+    new_users_1d: int
+    new_users_7d: int
+    new_users_30d: int
+    total_meals: int
+    meals_today: int
+    meals_7d: int
+    weekly_active_loggers: int          # NORTH STAR: distinct users who logged in last 7d
+    daily_active_loggers: int           # logged today
+    monthly_active_loggers: int         # logged in last 30d
+    adherent_loggers_7d: int            # logged on >=3 distinct days in last 7
+    app_open_dau: int                   # from events (0 until clients start pinging)
+    app_open_wau: int
+    total_events: int
+    db_size_mb: float
+
+
+class GrowthDay(BaseModel):
+    date: str
+    signups: int
+    cumulative_users: int
+    active_loggers: int                 # distinct users who logged that day
+    meals: int
+
+
+class GrowthResponse(BaseModel):
+    days: int
+    by_day: list[GrowthDay] = Field(default_factory=list)

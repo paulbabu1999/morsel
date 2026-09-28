@@ -1,7 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { api, getToken } from "../api";
+import { api, getToken, logEvent } from "../api";
 import type { AuthUser } from "../api";
+
+/** Fire an `app_open` telemetry event at most once per tab session (so DAU counts
+ *  people, not route changes). Best-effort — logEvent never throws. */
+function appOpenOnce() {
+  try {
+    if (sessionStorage.getItem("morsel_app_open")) return;
+    sessionStorage.setItem("morsel_app_open", "1");
+  } catch {
+    /* storage disabled — still fire once for this load below */
+  }
+  logEvent("app_open");
+}
 
 interface AuthContextValue {
   /** The signed-in user, or null when logged out. */
@@ -38,7 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .me()
       .then((u) => {
-        if (alive) setUser(u);
+        if (alive) {
+          setUser(u);
+          appOpenOnce();
+        }
       })
       .catch(() => {
         // Expired / invalid token — drop it and stay logged out.
@@ -57,12 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const r = await api.login(email, password);
-    setUser({ user_id: r.user_id, email: r.email });
+    setUser({ user_id: r.user_id, email: r.email, is_admin: r.is_admin });
+    appOpenOnce();
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
     const r = await api.signup(email, password);
-    setUser({ user_id: r.user_id, email: r.email });
+    setUser({ user_id: r.user_id, email: r.email, is_admin: r.is_admin });
+    appOpenOnce();
   }, []);
 
   const signOut = useCallback(() => {

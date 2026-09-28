@@ -296,6 +296,76 @@ def create_user(user_id: str, email: str, password_hash: str) -> None:
         conn.commit()
 
 
+# --- analytics events (append-only, no RLS; best-effort telemetry) ----------
+
+# Cap what one event row can carry so a hostile/buggy client can't bloat the table
+# (0.5GB Neon budget). Applied to every event, server- or client-sourced.
+_MAX_PROP_KEYS = 24
+_MAX_PROP_STR = 200
+
+
+def _safe_props(props: dict | None) -> dict:
+    """Whitelist props to JSON scalars, drop nesting, truncate strings, cap count."""
+    out: dict = {}
+    if not isinstance(props, dict):
+        return out
+    for k, v in list(props.items())[:_MAX_PROP_KEYS]:
+        key = str(k)[:64]
+        if v is None or isinstance(v, (bool, int, float)):
+            out[key] = v
+        else:
+            out[key] = str(v)[:_MAX_PROP_STR]
+    return out
+
+
+def log_event(
+    event: str,
+    user_id: str | None = None,
+    *,
+    session_id: str | None = None,
+    platform: str | None = None,
+    duration_ms: int | None = None,
+    props: dict | None = None,
+) -> None:
+    """Best-effort append to `events`. NEVER raises and NEVER blocks the caller's
+    result — invoke it via BackgroundTasks. Uses a plain app_pool connection (events
+    has no RLS, so no app_tx/GUC). Any failure (DB down, pool timeout, cold start)
+    is swallowed: telemetry must not break a user request."""
+    from psycopg.types.json import Json
+
+    try:
+        with db.app_pool().connection(timeout=2.0) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO events (user_id, session_id, event, platform, duration_ms, props) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    (
+                        user_id, (session_id or None), str(event)[:80], (platform or None),
+                        (int(duration_ms) if duration_ms is not None else None),
+                        Json(_safe_props(props)),
+                    ),
+                )
+            conn.commit()
+    except Exception:
+        pass  # best-effort: telemetry never fails a request
+
+
+def prune_events(days: int = 90) -> int:
+    """Delete events older than `days`. Returns rows removed (0 on any error)."""
+    try:
+        with db.app_pool().connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM events WHERE ts < now() - make_interval(days => %s)",
+                    (int(days),),
+                )
+                n = cur.rowcount
+            conn.commit()
+            return n if n and n > 0 else 0
+    except Exception:
+        return 0
+
+
 def _dict_row():
     from psycopg.rows import dict_row
 

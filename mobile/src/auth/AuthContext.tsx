@@ -1,5 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { ApiError, loadToken, login, logout, me, onAuthExpired, signup, type AuthUser } from '../api';
+import { ApiError, loadToken, logEvent, login, logout, me, onAuthExpired, signup, type AuthUser } from '../api';
+
+/** Fire an `app_open` telemetry event once per app launch (so DAU counts people,
+ *  not re-renders). Best-effort — logEvent never throws. */
+let appOpened = false;
+function appOpenOnce() {
+  if (appOpened) return;
+  appOpened = true;
+  logEvent('app_open');
+}
 
 interface AuthContextValue {
   /** The signed-in user, or null when logged out. */
@@ -39,7 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       try {
         const u = await me();
-        if (alive) setUser(u);
+        if (alive) {
+          setUser(u);
+          appOpenOnce();
+        }
       } catch (err) {
         // Only a genuine auth failure means the token is bad — clear it. A
         // network blip or cold-start timeout shouldn't nuke a possibly-valid
@@ -63,11 +75,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async (email: string, password: string) => {
     const r = await login(email, password);
     setUser({ user_id: r.user_id, email: r.email });
+    appOpenOnce();
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
     const r = await signup(email, password);
     setUser({ user_id: r.user_id, email: r.email });
+    appOpenOnce();
   }, []);
 
   const signOut = useCallback(async () => {

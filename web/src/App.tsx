@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Sidebar, MobileNav } from "./components/Sidebar";
 import { Welcome } from "./components/Welcome";
@@ -18,6 +18,12 @@ import { ProfileProvider, useProfile } from "./lib/profile";
 import { useAuth } from "./lib/auth";
 import { hasSeenWelcome } from "./lib/welcome";
 import { Loading } from "./components/states";
+
+// Admin-only operator dashboard — lazy so its recharts payload stays out of the
+// main bundle for the ~everyone who never opens it.
+const Analytics = lazy(() =>
+  import("./pages/Analytics").then((m) => ({ default: m.Analytics })),
+);
 
 /** Scroll to top on route change. */
 function ScrollToTop() {
@@ -86,7 +92,11 @@ function AppShell() {
   // Let invite links redeem before the onboarding gate takes over, so a brand-new
   // signup arriving via an invite still gets connected to their friend.
   const needsOnboarding =
-    loaded && profile === null && pathname !== "/profile" && !pathname.startsWith("/invite");
+    loaded &&
+    profile === null &&
+    pathname !== "/profile" &&
+    !pathname.startsWith("/invite") &&
+    !pathname.startsWith("/admin"); // operators can reach analytics without a diet profile
 
   return (
     <div className="app-shell">
@@ -115,6 +125,21 @@ function AppShell() {
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/invite/:token" element={<Invite />} />
+            {/* Operator analytics: gated on is_admin (the route element itself, not
+                just nav visibility). Non-admins who type the URL bounce home; the
+                API endpoints are the real gate. */}
+            <Route
+              path="/admin/analytics"
+              element={
+                user?.is_admin ? (
+                  <Suspense fallback={<Loading label="Loading analytics…" />}>
+                    <Analytics />
+                  </Suspense>
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
             {/* Auth screens are public-only; once signed in, bounce home. */}
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />

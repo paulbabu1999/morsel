@@ -273,3 +273,56 @@ ALTER TABLE weight_logs FORCE  ROW LEVEL SECURITY;
 CREATE POLICY weight_logs_isolation ON weight_logs
     USING (user_id = current_setting('app.current_user_id', true));
 GRANT SELECT, INSERT, UPDATE, DELETE ON weight_logs TO morsel_app;
+
+-- ---------------------------------------------------------------------------
+-- Analytics events — append-only operator/behavioral telemetry. Cross-user by
+-- nature (the admin dashboard aggregates across everyone), so NO row-level
+-- security — like the social tables. Written best-effort by app/repo.log_event.
+-- BIGINT IDENTITY needs no sequence grant (that's why this file grants no
+-- sequences to the app roles and still works).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS events (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id     TEXT,                                 -- nullable (anon/server events); no FK
+    session_id  TEXT,
+    event       TEXT      NOT NULL,
+    ts          TIMESTAMP NOT NULL DEFAULT now(),     -- server wall-clock, like every other ts
+    platform    TEXT,                                 -- web | ios | android | server
+    duration_ms INTEGER,
+    props       JSONB     NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS events_ts_idx       ON events (ts DESC);
+CREATE INDEX IF NOT EXISTS events_event_ts_idx ON events (event, ts DESC);
+CREATE INDEX IF NOT EXISTS events_user_ts_idx  ON events (user_id, ts DESC);
+
+-- morsel_app's ALTER DEFAULT PRIVILEGES (earlier) already granted it DML on events;
+-- state it explicitly too (it needs DELETE for the >90d prune).
+GRANT SELECT, INSERT, DELETE ON events TO morsel_app;
+-- CRITICAL: morsel_ro's ALTER DEFAULT PRIVILEGES auto-granted it SELECT on events.
+-- The LLM text-to-SQL role must NEVER read telemetry — revoke it. (sql_guard's
+-- table allowlist also omits `events`, but revoke at the DB too.)
+REVOKE ALL ON events FROM morsel_ro;
+
+-- ---------------------------------------------------------------------------
+-- Read-only, cross-user analytics role for the admin dashboard ONLY
+-- (app/analytics_service.py via db.run_analytics_sql). BYPASSRLS so it can
+-- count/sum across ALL users — morsel_app is NOBYPASSRLS and only ever sees one
+-- user via the GUC. Hard-bounded: SELECT-only, read-only txns, statement timeout,
+-- password_hash never granted, admin-gated usage, and it MUST NEVER run LLM SQL.
+-- neondb_owner has CREATEROLE + rolbypassrls, so it can create this role; verify
+-- once with \du morsel_analytics. If a Neon project refuses BYPASSRLS, drop that
+-- keyword and instead add, per RLS table (meals, meal_items, user_profile,
+-- weight_logs): CREATE POLICY <t>_analytics_read ON <t> FOR SELECT TO
+-- morsel_analytics USING (true);  -- no app-code change needed.
+-- Set a real password here (or ALTER ROLE ... PASSWORD afterward) and mirror it
+-- into MORSEL_ANALYTICS_DSN.
+-- ---------------------------------------------------------------------------
+CREATE ROLE morsel_analytics WITH LOGIN PASSWORD 'MORSEL_ANALYTICS_PW'
+    NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
+GRANT USAGE ON SCHEMA public TO morsel_analytics;
+GRANT SELECT ON meals, meal_items, user_profile, weight_logs, food_entities,
+                 follows, groups, group_members, shared_meals, events
+    TO morsel_analytics;
+GRANT SELECT (id, email, created_at, display_name) ON users TO morsel_analytics;
+ALTER ROLE morsel_analytics SET default_transaction_read_only = on;
+ALTER ROLE morsel_analytics SET statement_timeout = '15s';

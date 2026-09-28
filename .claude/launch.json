@@ -9,6 +9,15 @@
         "VITE_API_URL=https://morsel-api-9s89.onrender.com npm --prefix web run dev"
       ],
       "port": 5173
+    },
+    {
+      "name": "bite-web-local",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "VITE_API_URL=http://localhost:8000 npm --prefix web run dev"
+      ],
+      "port": 5173
     }
   ]
 }

@@ -75,6 +75,27 @@ def current_user_id(creds: HTTPAuthorizationCredentials = Depends(_security)) ->
     return uid
 
 
+# --- admin / analytics gate ------------------------------------------------
+
+def is_admin(user_id: str) -> bool:
+    """True iff the user's email is in the ADMIN_EMAILS allowlist. Fail-closed:
+    an empty allowlist means nobody is an admin."""
+    if not config.ADMIN_EMAILS:
+        return False
+    u = repo.get_user(user_id)
+    email = ((u or {}).get("email") or "").lower()
+    return bool(email) and email in config.ADMIN_EMAILS
+
+
+def require_admin(user_id: str = Depends(current_user_id)) -> str:
+    """FastAPI dependency: the authed user_id, but only for operators (403 else).
+    This server-side check is the REAL analytics gate; the client `is_admin` flag
+    only decides whether to render the nav link."""
+    if not is_admin(user_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin access required")
+    return user_id
+
+
 # --- signup / login --------------------------------------------------------
 
 def signup(email: str, password: str) -> tuple[str, str]:

@@ -7,6 +7,7 @@ import {
   IconAsk,
   IconBell,
   IconCamera,
+  IconChart,
   IconHistory,
   IconHome,
   IconLogout,
@@ -31,6 +32,8 @@ const SECONDARY: Link[] = [
   { to: "/profile", label: "Profile", Icon: IconUser },
 ];
 const LINKS = [...PRIMARY, ...SECONDARY];
+/** Operator-only; appended to the nav for admins (the route + API are the real gate). */
+const ADMIN_LINK: Link = { to: "/admin/analytics", label: "Analytics", Icon: IconChart };
 
 function IconDots() {
   return (
@@ -88,6 +91,8 @@ function Account() {
 
 /** Desktop: a persistent left rail with every destination. */
 export function Sidebar() {
+  const { user } = useAuth();
+  const links = user?.is_admin ? [...LINKS, ADMIN_LINK] : LINKS;
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -100,7 +105,7 @@ export function Sidebar() {
 
       <nav className="nav">
         <div className="nav-label">Menu</div>
-        {LINKS.map(({ to, label, Icon }) => (
+        {links.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -126,6 +131,7 @@ export function Sidebar() {
 export function MobileNav() {
   const { user, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const secondary = user?.is_admin ? [...SECONDARY, ADMIN_LINK] : SECONDARY;
 
   return (
     <>
@@ -142,7 +148,7 @@ export function MobileNav() {
           <div className="mnav-scrim" onClick={() => setOpen(false)} />
           <div className="mnav-sheet" role="menu">
             <div className="mnav-sheet-grid">
-              {SECONDARY.map(({ to, label, Icon }) => (
+              {secondary.map(({ to, label, Icon }) => (
                 <NavLink
                   key={to}
                   to={to}
